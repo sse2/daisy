@@ -1,0 +1,7 @@
+.vs
+artifacts
+int
+*.sln
+*.vcxproj
+*.vcxproj.filters
+*.vcxproj.user

@@ -1,0 +1,30 @@
+﻿---
+BasedOnStyle: Microsoft
+ConstructorInitializerAllOnOneLineOrOnePerLine: 'true'
+IndentWidth: '2'
+KeepEmptyLinesAtTheStartOfBlocks: 'true'
+Language: Cpp
+MaxEmptyLinesToKeep: '3'
+NamespaceIndentation: All
+SortIncludes: 'false'
+SpaceAfterCStyleCast: 'true'
+SpaceAfterLogicalNot: 'false'
+SpaceAfterTemplateKeyword: 'true'
+SpaceBeforeAssignmentOperators: 'true'
+SpaceBeforeCpp11BracedList: 'true'
+SpaceBeforeCtorInitializerColon: 'true'
+SpaceBeforeInheritanceColon: 'true'
+SpaceBeforeParens: Always
+SpaceBeforeRangeBasedForLoopColon: 'true'
+SpaceInEmptyParentheses: 'true'
+SpacesBeforeTrailingComments: '1'
+SpacesInAngles: 'true'
+SpacesInCStyleCastParentheses: 'true'
+SpacesInContainerLiterals: 'true'
+SpacesInParentheses: 'true'
+SpacesInSquareBrackets: 'true'
+TabWidth: '4'
+ColumnLimit: '0'
+UseTab: Never
+
+...
