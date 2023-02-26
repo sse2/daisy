@@ -96,6 +96,7 @@ a more in-depth example can be found in example/example.cc. it's heavily recomme
 some things you might want to take into consideration before using daisy:
 
  - the API *could* change at any moment. it probably won't, but it *might* if i'm unhappy with it.
+ - daisy relies on some STL containers. (specifically, unordered_map, string_view and it's wide counterpart, vector & array)
  - while i've tried my best to make the API as beginner friendly as possible, expanding daisy might be a bit of a hassle.
  - (more) proper error logging and handling is still on the todo list. for now, at best you get a return value, at worst the library fails silently and continues like nothing happened. (eg. when a glyph isn't supported by a font, the character gets ignored)
  
