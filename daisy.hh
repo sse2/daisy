@@ -6,6 +6,7 @@
 #include <string_view> // std::string_view
 #include <vector> // std::vector
 #include <array> // std::array
+#include <atomic> // std::atomic
 #include <cstdint> // uint/int types
  
 // d3d9
@@ -42,8 +43,8 @@ namespace daisy
   // buffer
   struct renderbuffer_t
   {
-    void *m_data;
-    uint32_t m_capacity, m_size;
+    void *m_data { nullptr };
+    uint32_t m_capacity { 0 }, m_size { 0 };
   };
 
   // kind of calls submitted
@@ -115,8 +116,19 @@ namespace daisy
     static inline IDirect3DDevice9 *s_device = nullptr;
   };
 
+  class c_daisy_resettable_object
+  {
+  public:
+    /// <summary>
+    /// called on device reset (pre/post)
+    /// </summary>
+    /// <param name="pre_reset">if this is called before device is reset</param>
+    /// <returns>true on success, false otherwise</returns>
+    virtual bool reset ( bool pre_reset = false ) noexcept = 0;
+  };
+
   // our font wrapper class
-  class c_daisy_fontwrapper
+  class c_fontwrapper : public c_daisy_resettable_object
   {
   private:
     // members
@@ -169,7 +181,7 @@ namespace daisy
       daisy_t::s_device->GetDeviceCaps ( &caps );
 
       // ensure our atlas isn't above max texture cap
-      // @todo: split textures
+      // @todo; use texatlas
       if ( this->m_width > static_cast< uint32_t > ( caps.MaxTextureWidth ) )
       {
         this->m_scale = static_cast< float > ( caps.MaxTextureWidth ) / this->m_width;
@@ -202,7 +214,7 @@ namespace daisy
       BITMAPINFO bitmap_ctx { };
       bitmap_ctx.bmiHeader.biSize = sizeof ( BITMAPINFOHEADER );
       bitmap_ctx.bmiHeader.biWidth = this->m_width;
-      bitmap_ctx.bmiHeader.biHeight = -this->m_height;
+      bitmap_ctx.bmiHeader.biHeight = -static_cast< int32_t > ( this->m_height );
       bitmap_ctx.bmiHeader.biPlanes = 1;
       bitmap_ctx.bmiHeader.biCompression = BI_RGB;
       bitmap_ctx.bmiHeader.biBitCount = 32;
@@ -308,10 +320,10 @@ namespace daisy
       for ( uint32_t r = 0; r < glyph_sets->cRanges; ++r )
       {
         // iterate glyphs
-        for ( auto chr = glyph_sets->ranges[ r ].wcLow; chr < ( glyph_sets->ranges[ r ].wcLow + glyph_sets->ranges[ r ].cGlyphs ); ++chr )
+        for ( auto ch = glyph_sets->ranges[ r ].wcLow; ch < ( glyph_sets->ranges[ r ].wcLow + glyph_sets->ranges[ r ].cGlyphs ); ++ch )
         {
           // get metrics of the current character
-          if ( !GetTextExtentPoint32W ( context, &chr, 1, &size ) )
+          if ( !GetTextExtentPoint32W ( context, &ch, 1, &size ) )
             continue;
 
           if ( x + size.cx + this->m_spacing > this->m_width )
@@ -329,16 +341,16 @@ namespace daisy
 
           if ( !measure )
           {
-            if ( !ExtTextOutW ( context, x + 0, y + 0, ETO_OPAQUE, nullptr, &chr, 1, nullptr ) )
+            if ( !ExtTextOutW ( context, x + 0, y + 0, ETO_OPAQUE, nullptr, &ch, 1, nullptr ) )
             {
               free ( glyph_sets );
               return 1;
             }
 
-            this->m_coords[ static_cast< uint16_t > ( chr ) ][ 0 ] = ( static_cast< float > ( x + 0 - this->m_spacing ) ) / this->m_width;
-            this->m_coords[ static_cast< uint16_t > ( chr ) ][ 1 ] = ( static_cast< float > ( y + 0 + 0 ) ) / this->m_height;
-            this->m_coords[ static_cast< uint16_t > ( chr ) ][ 2 ] = ( static_cast< float > ( x + size.cx + this->m_spacing ) ) / this->m_width;
-            this->m_coords[ static_cast< uint16_t > ( chr ) ][ 3 ] = ( static_cast< float > ( y + size.cy + 0 ) ) / this->m_height;
+            this->m_coords[ static_cast< uint16_t > ( ch ) ][ 0 ] = ( static_cast< float > ( x + 0 - this->m_spacing ) ) / this->m_width;
+            this->m_coords[ static_cast< uint16_t > ( ch ) ][ 1 ] = ( static_cast< float > ( y + 0 + 0 ) ) / this->m_height;
+            this->m_coords[ static_cast< uint16_t > ( ch ) ][ 2 ] = ( static_cast< float > ( x + size.cx + this->m_spacing ) ) / this->m_width;
+            this->m_coords[ static_cast< uint16_t > ( ch ) ][ 3 ] = ( static_cast< float > ( y + size.cy + 0 ) ) / this->m_height;
           }
 
           x += size.cx + ( 2 * this->m_spacing );
@@ -352,14 +364,14 @@ namespace daisy
 
   public:
     // inits everything with 0
-    c_daisy_fontwrapper ( ) noexcept
+    c_fontwrapper ( ) noexcept
         : m_family ( ), m_texture_handle ( nullptr ), m_scale ( 0.f ), m_width ( 0 ), m_height ( 0 ), m_spacing ( 0 ), m_size ( 0 ), m_flags ( 0 )
     {
     }
 
     // disallow copying
-    c_daisy_fontwrapper ( const c_daisy_fontwrapper & ) = delete;
-    c_daisy_fontwrapper &operator= ( const c_daisy_fontwrapper & ) = delete;
+    c_fontwrapper ( const c_fontwrapper & ) = delete;
+    c_fontwrapper &operator= ( const c_fontwrapper & ) = delete;
 
     /// <summary>
     /// creates font instance and atlas
@@ -369,7 +381,7 @@ namespace daisy
     /// <param name="quality">font quality (NONANTIALIASED_QUALITY, CLEARTYPE_NATURAL_QUALITY etc.)</param>
     /// <param name="flags">font flags (see enum daisy_font_flags; FONT_DEFAULT, FONT_BOLD, FONT_ITALIC)</param>
     /// <returns>true on succesful font creation, false otherwise</returns>
-    bool create ( const std::string_view family, uint32_t height, uint32_t quality, uint8_t flags ) noexcept
+    [[nodiscard]] bool create ( const std::string_view family, uint32_t height, uint32_t quality, uint8_t flags ) noexcept
     {
       this->m_family = family;
       this->m_size = height;
@@ -434,7 +446,7 @@ namespace daisy
     /// </summary>
     /// <param name="pre_reset">if this is called before device is reset</param>
     /// <returns>true on success, false otherwise</returns>
-    bool reset ( bool pre_reset = false ) noexcept
+    [[nodiscard]] virtual bool reset ( bool pre_reset = false ) noexcept override
     {
       if ( !pre_reset )
         return this->create_ex ( );
@@ -473,7 +485,8 @@ namespace daisy
       if ( this->m_coords.find ( glyph ) != this->m_coords.end ( ) )
         return this->m_coords.at ( glyph );
 
-      return uv_t { 0.f, 0.f, 0.f, 0.f };
+      static uv_t null_uv { 0.f, 0.f, 0.f, 0.f };
+      return null_uv;
     }
 
     /// <summary>
@@ -520,11 +533,9 @@ namespace daisy
     {
       return this->m_texture_handle;
     }
-
-    // @todo; clean
   };
 
-  class c_daisytexatlas
+  class c_texatlas : public c_daisy_resettable_object
   {
   private:
     std::unordered_map< uint32_t, uv_t > m_coords;
@@ -533,21 +544,21 @@ namespace daisy
     float m_max_height;
 
   public:
-    c_daisytexatlas ( ) noexcept
+    c_texatlas ( ) noexcept
         : m_cursor ( { 0.f, 0.f } ), m_dimensions ( { 0.f, 0.f } ), m_texture_handle ( nullptr ), m_max_height ( 0.f )
     {
     }
 
     // disable copying
-    c_daisytexatlas ( const c_daisytexatlas & ) = delete;
-    c_daisytexatlas &operator= ( const c_daisytexatlas & ) = delete;
+    c_texatlas ( const c_texatlas & ) = delete;
+    c_texatlas &operator= ( const c_texatlas & ) = delete;
 
     /// <summary>
     /// creates a texture atlas
     /// </summary>
     /// <param name="dimensions">texture atlas dimensions</param>
     /// <returns>true on success, false otherwise</returns>
-    bool create ( const point_t &dimensions ) noexcept
+    [[nodiscard]] bool create ( const point_t &dimensions ) noexcept
     {
       if ( !daisy_t::s_device )
         return false;
@@ -567,7 +578,7 @@ namespace daisy
     /// </summary>
     /// <param name="pre_reset">if this is called before device is reset</param>
     /// <returns>true on success, false otherwise</returns>
-    bool reset ( bool pre_reset = false ) noexcept
+    [[nodiscard]] virtual bool reset ( bool pre_reset = false ) noexcept override
     {
       if ( !pre_reset )
         return this->create ( this->m_dimensions );
@@ -648,7 +659,11 @@ namespace daisy
     /// <returns>UV coordinates of texture</returns>
     const uv_t &coords ( uint32_t uuid ) const noexcept
     {
-      return this->m_coords.at ( uuid );
+      if ( this->m_coords.find ( uuid ) != this->m_coords.end ( ) )
+        return this->m_coords.at ( uuid );
+
+      static uv_t null_uv { 0.f, 0.f, 0.f, 0.f };
+      return null_uv;
     }
 
     /// <summary>
@@ -661,7 +676,7 @@ namespace daisy
     }
   };
 
-  class c_renderqueue
+  class c_renderqueue : public c_daisy_resettable_object
   {
   private:
     IDirect3DVertexBuffer9 *m_vertex_buffer;
@@ -745,31 +760,37 @@ namespace daisy
     /// <summary>
     /// initializes current queue by initializing vertex and index buffers
     /// </summary>
-    /// <param name="mex_verts">max capacity of vertex buffer</param>
+    /// <param name="max_verts">max capacity of vertex buffer</param>
     /// <param name="max_indices">max capacity of index buffer</param>
     /// <returns>true on success, false otherwise</returns>
-    bool create ( const uint32_t mex_verts = 32767, const uint32_t max_indices = 65535 ) noexcept
+    [[nodiscard]] bool create ( const uint32_t max_verts = 32767, const uint32_t max_indices = 65535 ) noexcept 
     {
       if ( !daisy_t::s_device )
         return false;
 
-      // create gpu buffers
+      // create d3d9 buffers
       if ( !this->m_vertex_buffer )
-        if ( daisy_t::s_device->CreateVertexBuffer ( sizeof ( daisy_vtx_t ) * mex_verts, D3DUSAGE_DYNAMIC | D3DUSAGE_WRITEONLY, ( D3DFVF_XYZRHW | D3DFVF_DIFFUSE | D3DFVF_TEX1 ), D3DPOOL_DEFAULT, &this->m_vertex_buffer, nullptr ) < 0 )
+        if ( daisy_t::s_device->CreateVertexBuffer ( sizeof ( daisy_vtx_t ) * max_verts, D3DUSAGE_DYNAMIC | D3DUSAGE_WRITEONLY, ( D3DFVF_XYZRHW | D3DFVF_DIFFUSE | D3DFVF_TEX1 ), D3DPOOL_DEFAULT, &this->m_vertex_buffer, nullptr ) < 0 )
           return false;
 
       if ( !this->m_index_buffer )
         if ( daisy_t::s_device->CreateIndexBuffer ( sizeof ( uint16_t ) * max_indices, D3DUSAGE_DYNAMIC | D3DUSAGE_WRITEONLY, D3DFMT_INDEX16, D3DPOOL_DEFAULT, &this->m_index_buffer, nullptr ) < 0 )
           return false;
 
-      // create cpu side buffers
-      this->m_vtxs.m_data = malloc ( sizeof ( daisy_vtx_t ) * mex_verts );
-      this->m_vtxs.m_capacity = mex_verts;
-      this->m_vtxs.m_size = 0;
+      // create local buffers
+      if ( !this->m_vtxs.m_data )
+      {
+        this->m_vtxs.m_data = malloc ( sizeof ( daisy_vtx_t ) * max_verts );
+        this->m_vtxs.m_capacity = max_verts;
+        this->m_vtxs.m_size = 0;
+      }
 
-      this->m_idxs.m_data = malloc ( sizeof ( uint16_t ) * max_indices );
-      this->m_idxs.m_capacity = max_indices;
-      this->m_idxs.m_size = 0;
+      if ( !this->m_idxs.m_data )
+      {
+        this->m_idxs.m_data = malloc ( sizeof ( uint16_t ) * max_indices );
+        this->m_idxs.m_capacity = max_indices;
+        this->m_idxs.m_size = 0;
+      }
 
       if ( !this->m_vtxs.m_data || !this->m_idxs.m_data )
         return false;
@@ -787,6 +808,27 @@ namespace daisy
 
       if ( !this->m_drawcalls.empty ( ) )
         this->m_drawcalls.clear ( );
+    }
+
+    /// <summary>
+    /// called on device reset (pre/post)
+    /// </summary>
+    /// <param name="pre_reset">if this is called before device is reset</param>
+    /// <returns>true on success, false otherwise</returns>
+    [[nodiscard]] virtual bool reset ( bool pre_reset = false ) noexcept override
+    {
+      if ( !pre_reset )
+        return this->create ( this->m_vtxs.m_capacity, this->m_idxs.m_capacity );
+      else
+      {
+        if ( this->m_vertex_buffer )
+          this->m_vertex_buffer->Release ( );
+
+        if ( this->m_index_buffer )
+          this->m_index_buffer->Release ( );
+      }
+
+      return true;
     }
 
     /// <summary>
@@ -840,7 +882,7 @@ namespace daisy
       // render commands
       for ( const auto &cmd : this->m_drawcalls )
       {
-        // @todo: support shaders as well
+        // @todo: more proper support for shaders
         switch ( cmd.m_kind )
         {
         case daisy_call_kind::CALL_TRI:
@@ -1011,13 +1053,13 @@ namespace daisy
     /// push a string with a given font to drawlist
     /// </summary>
     /// <typeparam name="t">iteratable text container (only char and wchar_t accepted currently)</typeparam>
-    /// <param name="font">initialized c_daisy_fontwrapper instance</param>
+    /// <param name="font">initialized c_fontwrapper instance</param>
     /// <param name="position">position of text</param>
     /// <param name="text">text to draw</param>
     /// <param name="color">color of text to draw</param>
     /// <param name="alignment">alignment of text to draw</param>
     template<typename t = std::string_view>
-    void push_text ( c_daisy_fontwrapper &font, const point_t &position, const t text, const color_t &color, uint16_t alignment = TEXT_ALIGN_DEFAULT ) noexcept
+    void push_text ( c_fontwrapper &font, const point_t &position, const t text, const color_t &color, uint16_t alignment = TEXT_ALIGN_DEFAULT ) noexcept
     {
       uint32_t additional_indices = this->begin_batch ( font.texture_handle ( ) );
       uint32_t cont_vertices = 0, cont_indices = 0, cont_primitives = 0;
@@ -1123,6 +1165,128 @@ namespace daisy
       this->end_batch ( additional_indices, cont_vertices, cont_indices, cont_primitives, font.texture_handle ( ) );
     }
   };
+
+  class c_doublebuffer_queue : public c_daisy_resettable_object
+  {
+  private:
+    c_renderqueue m_front_queue, m_back_queue;
+    std::atomic< bool > m_swap_drawlists;
+
+  public:
+    /// <summary>
+    /// initializes current queue by initializing vertex and index buffers
+    /// </summary>
+    /// <param name="max_verts">max capacity of vertex buffer</param>
+    /// <param name="max_indices">max capacity of index buffer</param>
+    /// <returns>true on success, false otherwise</returns>
+    [[nodiscard]] bool create ( const uint32_t max_verts = 32767, const uint32_t max_indices = 65535 ) noexcept
+    {
+      if ( !this->m_front_queue.create ( max_verts, max_indices ) )
+        return false;
+
+      if ( !this->m_back_queue.create ( max_verts, max_indices ) )
+        return false;
+
+      return true;
+    }
+
+    /// <summary>
+    /// called on device reset (pre/post)
+    /// </summary>
+    /// <param name="pre_reset">if this is called before device is reset</param>
+    /// <returns>true on success, false otherwise</returns>
+    [[nodiscard]] virtual bool reset ( bool pre_reset = false ) noexcept override
+    {
+      return this->m_front_queue.reset ( pre_reset ) && this->m_back_queue.reset ( pre_reset );
+    }
+    
+    /// <summary>
+    /// swap back and front drawlists
+    /// </summary>
+    void swap ( ) noexcept
+    {
+      this->m_swap_drawlists = !this->m_swap_drawlists;
+    }
+
+    /// <summary>
+    /// access currently safe render queue
+    /// </summary>
+    /// <returns>queue</returns>
+    c_renderqueue *queue ( ) noexcept
+    {
+      return ( !this->m_swap_drawlists ? &this->m_front_queue : &this->m_back_queue );
+    }
+
+    /// <summary>
+    /// flushes currently filled queue
+    /// </summary>
+    void flush ( )
+    {
+      this->m_swap_drawlists ? this->m_front_queue.flush ( ) : this->m_back_queue.flush ( );
+    }
+  };
+
+  /// <summary>
+  /// initializes daisy
+  /// </summary>
+  /// <param name="device">d3d9 device handle</param>
+  inline static void daisy_initialize ( IDirect3DDevice9* device ) noexcept
+  {
+    daisy_t::s_device = device;
+  }
+
+  /// <summary>
+  /// prepares render state for daisy
+  /// </summary>
+  inline static void daisy_prepare ( ) noexcept
+  {
+    daisy_t::s_device->SetRenderState ( D3DRS_ZENABLE, FALSE );
+    daisy_t::s_device->SetRenderState ( D3DRS_ALPHABLENDENABLE, TRUE );
+    daisy_t::s_device->SetRenderState ( D3DRS_SRCBLEND, D3DBLEND_SRCALPHA );
+    daisy_t::s_device->SetRenderState ( D3DRS_SRCBLENDALPHA, D3DBLEND_INVDESTALPHA );
+    daisy_t::s_device->SetRenderState ( D3DRS_DESTBLEND, D3DBLEND_INVSRCALPHA );
+    daisy_t::s_device->SetRenderState ( D3DRS_DESTBLENDALPHA, D3DBLEND_ONE );
+    daisy_t::s_device->SetRenderState ( D3DRS_ALPHATESTENABLE, FALSE );
+    daisy_t::s_device->SetRenderState ( D3DRS_SEPARATEALPHABLENDENABLE, TRUE );
+    daisy_t::s_device->SetRenderState ( D3DRS_ALPHAREF, 0x08 );
+    daisy_t::s_device->SetRenderState ( D3DRS_ALPHAFUNC, D3DCMP_GREATEREQUAL );
+    daisy_t::s_device->SetRenderState ( D3DRS_LIGHTING, FALSE );
+    daisy_t::s_device->SetRenderState ( D3DRS_FILLMODE, D3DFILL_SOLID );
+    daisy_t::s_device->SetRenderState ( D3DRS_CULLMODE, D3DCULL_NONE );
+    daisy_t::s_device->SetRenderState ( D3DRS_SCISSORTESTENABLE, TRUE );
+    daisy_t::s_device->SetRenderState ( D3DRS_ZWRITEENABLE, FALSE );
+    daisy_t::s_device->SetRenderState ( D3DRS_STENCILENABLE, FALSE );
+    daisy_t::s_device->SetRenderState ( D3DRS_CLIPPING, TRUE );
+    daisy_t::s_device->SetRenderState ( D3DRS_CLIPPLANEENABLE, FALSE );
+    daisy_t::s_device->SetRenderState ( D3DRS_VERTEXBLEND, D3DVBF_DISABLE );
+    daisy_t::s_device->SetRenderState ( D3DRS_INDEXEDVERTEXBLENDENABLE, FALSE );
+    daisy_t::s_device->SetRenderState ( D3DRS_FOGENABLE, FALSE );
+    daisy_t::s_device->SetRenderState ( D3DRS_SRGBWRITEENABLE, FALSE );
+    daisy_t::s_device->SetRenderState ( D3DRS_COLORWRITEENABLE, D3DCOLORWRITEENABLE_RED | D3DCOLORWRITEENABLE_GREEN | D3DCOLORWRITEENABLE_BLUE | D3DCOLORWRITEENABLE_ALPHA );
+    daisy_t::s_device->SetRenderState ( D3DRS_MULTISAMPLEANTIALIAS, FALSE );
+    daisy_t::s_device->SetRenderState ( D3DRS_ANTIALIASEDLINEENABLE, FALSE );
+
+    daisy_t::s_device->SetTextureStageState ( 0, D3DTSS_COLOROP, D3DTOP_MODULATE );
+    daisy_t::s_device->SetTextureStageState ( 0, D3DTSS_COLORARG1, D3DTA_TEXTURE );
+    daisy_t::s_device->SetTextureStageState ( 0, D3DTSS_COLORARG2, D3DTA_DIFFUSE );
+    daisy_t::s_device->SetTextureStageState ( 0, D3DTSS_ALPHAOP, D3DTOP_MODULATE );
+    daisy_t::s_device->SetTextureStageState ( 0, D3DTSS_ALPHAARG1, D3DTA_TEXTURE );
+    daisy_t::s_device->SetTextureStageState ( 0, D3DTSS_ALPHAARG2, D3DTA_DIFFUSE );
+    daisy_t::s_device->SetTextureStageState ( 0, D3DTSS_TEXCOORDINDEX, 0 );
+    daisy_t::s_device->SetTextureStageState ( 0, D3DTSS_TEXTURETRANSFORMFLAGS, D3DTTFF_DISABLE );
+    daisy_t::s_device->SetTextureStageState ( 1, D3DTSS_COLOROP, D3DTOP_DISABLE );
+    daisy_t::s_device->SetTextureStageState ( 1, D3DTSS_ALPHAOP, D3DTOP_DISABLE );
+
+    daisy_t::s_device->SetSamplerState ( 0ul, D3DSAMP_ADDRESSU, D3DTADDRESS_WRAP );
+    daisy_t::s_device->SetSamplerState ( 0ul, D3DSAMP_ADDRESSV, D3DTADDRESS_WRAP );
+    daisy_t::s_device->SetSamplerState ( 0ul, D3DSAMP_ADDRESSW, D3DTADDRESS_WRAP );
+    daisy_t::s_device->SetSamplerState ( 0, D3DSAMP_MINFILTER, D3DTEXF_PYRAMIDALQUAD );
+    daisy_t::s_device->SetSamplerState ( 0, D3DSAMP_MAGFILTER, D3DTEXF_PYRAMIDALQUAD );
+    daisy_t::s_device->SetSamplerState ( 0, D3DSAMP_MIPFILTER, D3DTEXF_PYRAMIDALQUAD );
+
+    daisy_t::s_device->SetVertexShader ( nullptr );
+    daisy_t::s_device->SetPixelShader ( nullptr );
+  }
 } // namespace daisy
 
 #endif // _SSE2_DAISY_INCLUDE_GUARD
