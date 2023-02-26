@@ -599,7 +599,7 @@ namespace daisy
     /// <param name="tex_data">A8R8G8B8 texture data</param>
     /// <param name="tex_size">size of texture data in bytes</param>
     /// <returns>true on success, false otherwise</returns>
-    bool append ( const uint32_t uuid, const point_t &dimensions, uint8_t *tex_data, uint32_t tex_size )
+    bool append ( const uint32_t uuid, const point_t &dimensions, uint8_t *tex_data, uint32_t tex_size ) noexcept
     {
       // go down if not enough space left
       if ( this->m_cursor.x + dimensions.x > this->m_dimensions.x )
@@ -698,7 +698,7 @@ namespace daisy
     /// </summary>
     /// <param name="texture_handle">texture handle</param>
     /// <returns>0 if we can't batch this call, index offset on success</returns>
-    uint32_t begin_batch ( IDirect3DTexture9 *texture_handle = nullptr )
+    uint32_t begin_batch ( IDirect3DTexture9 *texture_handle = nullptr ) const noexcept
     {
       uint32_t additional = 0;
 
