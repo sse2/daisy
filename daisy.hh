@@ -1,3 +1,6 @@
+// daisy - a simple, tiny, very fast, well-documented, Windows only, header-only library for 2D primitive and text rendering using D3D9 & GDI, written in C++17
+// - written by munteanu octavian-adrian (https://github.com/sse2/daisy)
+// - MIT license (see end of file or github repo LICENSE.txt if you're unfamiliar with it)
 #ifndef _SSE2_DAISY_INCLUDE_GUARD
 #define _SSE2_DAISY_INCLUDE_GUARD
 
@@ -1290,3 +1293,25 @@ namespace daisy
 } // namespace daisy
 
 #endif // _SSE2_DAISY_INCLUDE_GUARD
+
+/*
+Copyright (c) 2023 Munteanu Octavian-Adrian
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+*/

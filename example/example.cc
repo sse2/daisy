@@ -151,6 +151,7 @@ INT WINAPI WinMain (
   // prepare d3d9 state for rendering
   // if daisy is the only thing you plan on rendering with, you can only do this once *safely*
   // if you're implementing daisy alongside in a codebase that changes device state
+  // you probably want to call this each frame before flushing render queues
   daisy::daisy_prepare ( );
 
   // render loop
@@ -207,7 +208,6 @@ INT WINAPI WinMain (
 
     // clearing is necessary if your queue has dynamic data
     queue.clear ( );
-
 
     g_device->EndScene ( );
     g_device->Present ( nullptr, nullptr, nullptr, nullptr );
