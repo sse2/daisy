@@ -5,6 +5,7 @@ a simple, tiny, very fast, well-documented, Windows only, header-only library fo
 
 # showcase
 ![daisy in action](https://i.imgur.com/37XbM1K.gif)
+
 daisy also runs on linux under Wine without any issues; footage will be added soon(TM)
 
 # why
@@ -95,6 +96,7 @@ a more in-depth example can be found in example/example.cc. it's heavily recomme
 some things you might want to take into consideration before using daisy:
 
  - the API *could* change at any moment. it probably won't, but it *might* if i'm unhappy with it.
+ - daisy relies on some STL containers. (specifically, unordered_map, string_view and it's wide counterpart, vector & array)
  - while i've tried my best to make the API as beginner friendly as possible, expanding daisy might be a bit of a hassle.
  - (more) proper error logging and handling is still on the todo list. for now, at best you get a return value, at worst the library fails silently and continues like nothing happened. (eg. when a glyph isn't supported by a font, the character gets ignored)
  
@@ -108,7 +110,7 @@ some things you might want to take into consideration before using daisy:
 - the documentation can always be better.
 
 # building daisy
-daisy should build with any modern Win32 C++ compiler that supports C++17 (both x86 and x64 builds should work just fine), however only clang 15 and latest MSVC are actively maintained. the library also shouldn't generate any warnings with `/W4` on clang and `/W3` on MSVC. 
+daisy should build with any modern Win32 C++ compiler that supports C++17 (both x86 and x64 builds should work just fine), however support out of the box is only guaranteed for clang 15+ and 2022+ versions of MSVC. the library also shouldn't generate any warnings with `/W4` on clang and `/W3` on MSVC. 
 
 # extra
 if you think i missed anything or have any questions, feel free to open an issue. 
