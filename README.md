@@ -7,6 +7,7 @@ a simple, tiny, very fast, well-documented, Windows only, header-only library fo
 ![daisy in action](https://i.imgur.com/37XbM1K.gif)
 
 daisy also runs on linux under Wine without any issues;
+
 ![daisy on linux in action](https://i.imgur.com/rjjVajE.gif)
 
 # why
