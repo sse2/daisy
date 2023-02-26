@@ -596,7 +596,7 @@ namespace daisy
     /// </summary>
     /// <param name="uuid">uuid of texture (can be whatever you want as long as it's unique per texture)</param>
     /// <param name="dimensions">dimensions of texture in pixels</param>
-    /// <param name="tex_data">RGBA texture data</param>
+    /// <param name="tex_data">A8R8G8B8 texture data</param>
     /// <param name="tex_size">size of texture data in bytes</param>
     /// <returns>true on success, false otherwise</returns>
     bool append ( const uint32_t uuid, const point_t &dimensions, uint8_t *tex_data, uint32_t tex_size )
