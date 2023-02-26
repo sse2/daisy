@@ -110,7 +110,7 @@ some things you might want to take into consideration before using daisy:
 - the documentation can always be better.
 
 # building daisy
-daisy should build with any modern Win32 C++ compiler that supports C++17 (both x86 and x64 builds should work just fine), however only clang 15 and latest MSVC are actively maintained. the library also shouldn't generate any warnings with `/W4` on clang and `/W3` on MSVC. 
+daisy should build with any modern Win32 C++ compiler that supports C++17 (both x86 and x64 builds should work just fine), however support out of the box is only guaranteed for clang 15+ and 2022+ versions of MSVC. the library also shouldn't generate any warnings with `/W4` on clang and `/W3` on MSVC. 
 
 # extra
 if you think i missed anything or have any questions, feel free to open an issue. 
