@@ -6,7 +6,8 @@ a simple, tiny, very fast, well-documented, Windows only, header-only library fo
 # showcase
 ![daisy in action](https://i.imgur.com/37XbM1K.gif)
 
-daisy also runs on linux under Wine without any issues; footage will be added soon(TM)
+daisy also runs on linux under Wine without any issues;
+![daisy on linux in action](https://i.imgur.com/rjjVajE.gif)
 
 # why
 this project was initially intended for a game modification, but it expanded into something that people might find useful on itself (eg. for debug overlays, writing your standalone HW-accelerated Windows application etc.). 
