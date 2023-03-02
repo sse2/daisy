@@ -692,7 +692,64 @@ namespace daisy
     // update d3d9 sided vtx/idx buffers
     bool m_update;
 
+    // reallocate d3d9 buffers
+    bool m_realloc_vtx, m_realloc_idx;
+
   private:
+    /// <summary>
+    /// ensures buffers have enough capacity for the draw call
+    /// </summary>
+    /// <param name="vertices_to_add">vertices to be added to buffer</param>
+    /// <param name="indices_to_add">indices to be added to buffer</param>
+    void ensure_buffers_capacity ( const uint32_t vertices_to_add, const uint32_t indices_to_add )
+    {
+      // check vtxbuf
+      if ( this->m_vtxs.m_size + vertices_to_add > this->m_vtxs.m_capacity )
+      {
+        // set new capacity
+        while ( this->m_vtxs.m_size + vertices_to_add > this->m_vtxs.m_capacity )
+          this->m_vtxs.m_capacity = this->m_vtxs.m_capacity * 2;
+
+        // create new vertex buf
+        void *new_vtx = malloc ( this->m_vtxs.m_capacity * sizeof ( daisy_vtx_t ) );
+
+        // copy old data over
+        memcpy ( new_vtx, this->m_vtxs.m_data, this->m_vtxs.m_size * sizeof ( daisy_vtx_t ) );
+
+        // d3d9 buf needs to be reallocated on new flush (we could do this here, however this ensures we're in the d3d9 rendering thread)
+        this->m_realloc_vtx = true;
+
+        // free old data
+        free ( this->m_vtxs.m_data );
+        this->m_vtxs.m_data = new_vtx;
+
+        printf ( "realloc'd vtx buf\n" );
+      }
+
+      // check idxbuf
+      if ( this->m_idxs.m_size + indices_to_add > this->m_idxs.m_capacity )
+      {
+        // set capacity
+        while ( this->m_idxs.m_size + indices_to_add > this->m_idxs.m_capacity )
+          this->m_idxs.m_capacity = this->m_idxs.m_capacity * 2;
+
+        // create new vertex buf
+        void *new_idx = malloc ( this->m_idxs.m_capacity * sizeof ( uint16_t ) );
+
+        // copy old data over
+        memcpy ( new_idx, this->m_idxs.m_data, this->m_idxs.m_size * sizeof ( uint16_t ) );
+
+        // d3d9 buf needs to be reallocated on new flush (we could do this here, however this ensures we're in the d3d9 rendering thread)
+        this->m_realloc_idx = true;
+
+        // free old data
+        free ( this->m_idxs.m_data );
+        this->m_idxs.m_data = new_idx;
+
+        printf ( "realloc'd idx buf\n" );
+      }
+    }
+
     /// <summary>
     /// checks if call can be batched
     /// </summary>
@@ -825,10 +882,16 @@ namespace daisy
       else
       {
         if ( this->m_vertex_buffer )
+        {
           this->m_vertex_buffer->Release ( );
+          this->m_vertex_buffer = nullptr;
+        }
 
         if ( this->m_index_buffer )
+        {
           this->m_index_buffer->Release ( );
+          this->m_index_buffer = nullptr;
+        }
       }
 
       return true;
@@ -839,6 +902,30 @@ namespace daisy
     /// </summary>
     void update ( ) noexcept
     {
+      if ( !daisy_t::s_device )
+        return;
+
+      // checking realloc
+      if ( this->m_realloc_vtx )
+      {
+        this->m_vertex_buffer->Release ( );
+
+        if ( daisy_t::s_device->CreateVertexBuffer ( static_cast< UINT > ( this->m_vtxs.m_capacity * sizeof ( daisy_vtx_t ) ), D3DUSAGE_DYNAMIC | D3DUSAGE_WRITEONLY, ( D3DFVF_XYZRHW | D3DFVF_DIFFUSE | D3DFVF_TEX1 ), D3DPOOL_DEFAULT, &this->m_vertex_buffer, nullptr ) < 0 )
+          return;
+
+        this->m_realloc_vtx = false;
+      }
+
+      if ( this->m_realloc_idx )
+      {
+        this->m_index_buffer->Release ( );
+
+        if ( daisy_t::s_device->CreateIndexBuffer ( static_cast< UINT > ( this->m_idxs.m_capacity * sizeof ( uint16_t ) ), D3DUSAGE_DYNAMIC | D3DUSAGE_WRITEONLY, D3DFMT_INDEX16, D3DPOOL_DEFAULT, &this->m_index_buffer, nullptr ) < 0 )
+          return;
+
+        this->m_realloc_idx = false;
+      }
+
       daisy_vtx_t *vert;
       uint16_t *indx;
 
@@ -942,6 +1029,8 @@ namespace daisy
     /// <param name="uv_maxs">uv maxs of rectangle in texture (by default {1, 1})</param>
     void push_gradient_rectangle ( const point_t &position, const point_t &size, const color_t c1, const color_t c2, const color_t c3, const color_t c4, IDirect3DTexture9 *texture_handle = nullptr, const point_t &uv_mins = { 0.f, 0.f }, const point_t &uv_maxs = { 1.f, 1.f } ) noexcept
     {
+      this->ensure_buffers_capacity ( 4 , 6 );
+
       uint32_t additional_indices = this->begin_batch ( texture_handle );
 
       daisy_vtx_t vtx[] = { daisy_vtx_t { { floorf ( position.x ), floorf ( position.y ), 0.0f, 1.f }, c1.bgra, { uv_mins.x, uv_mins.y } },                   // top-left
@@ -994,6 +1083,8 @@ namespace daisy
     /// <param name="uv3">uv bounds for the 3rd point</param>
     void push_filled_triangle ( const point_t &p1, const point_t &p2, const point_t &p3, const color_t c1, const color_t c2, const color_t c3, IDirect3DTexture9 *texture_handle = nullptr, const point_t &uv1 = { 0.f, 0.f }, const point_t &uv2 = { 0.f, 0.f }, const point_t &uv3 = { 0.f, 0.f } ) noexcept
     {
+      this->ensure_buffers_capacity ( 3, 3 );
+
       uint32_t additional_indices = this->begin_batch ( texture_handle );
 
       daisy_vtx_t vtx[] = { daisy_vtx_t { { floorf ( p1.x ), floorf ( p1.y ), 0.0f, 1.f }, c1.bgra, { uv1.x, uv1.y } },
@@ -1022,6 +1113,8 @@ namespace daisy
     /// <param name="width">width of line</param>
     void push_line ( const point_t &p1, const point_t &p2, const color_t &col, const float width = 1.f ) noexcept
     {
+      this->ensure_buffers_capacity ( 4, 6 );
+
       uint32_t additional_indices = this->begin_batch ( nullptr );
 
       // shoutout 8th grade math
@@ -1064,6 +1157,9 @@ namespace daisy
     template<typename t = std::string_view>
     void push_text ( c_fontwrapper &font, const point_t &position, const t text, const color_t &color, uint16_t alignment = TEXT_ALIGN_DEFAULT ) noexcept
     {
+      // this is a rough approximate, best we can do without passing thru the entire text twice.
+      this->ensure_buffers_capacity ( text.size ( ) * 4, text.size ( ) * 6 );
+
       uint32_t additional_indices = this->begin_batch ( font.texture_handle ( ) );
       uint32_t cont_vertices = 0, cont_indices = 0, cont_primitives = 0;
 
