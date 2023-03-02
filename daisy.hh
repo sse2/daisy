@@ -223,6 +223,9 @@ namespace daisy
       bitmap_ctx.bmiHeader.biBitCount = 32;
 
       bitmap = CreateDIBSection ( gdi_ctx, &bitmap_ctx, DIB_RGB_COLORS, reinterpret_cast< void ** > ( &bitmap_bits ), nullptr, 0 );
+      if ( !bitmap )
+        return false;
+
       prev_bitmap = SelectObject ( gdi_ctx, bitmap );
 
       SetTextColor ( gdi_ctx, RGB ( 255, 255, 255 ) );
@@ -368,7 +371,7 @@ namespace daisy
   public:
     // inits everything with 0
     c_fontwrapper ( ) noexcept
-        : m_family ( ), m_texture_handle ( nullptr ), m_scale ( 0.f ), m_width ( 0 ), m_height ( 0 ), m_spacing ( 0 ), m_size ( 0 ), m_flags ( 0 )
+        : m_family ( ), m_texture_handle ( nullptr ), m_scale ( 0.f ), m_width ( 0 ), m_height ( 0 ), m_spacing ( 0 ), m_size ( 0 ), m_quality ( NONANTIALIASED_QUALITY ), m_flags ( 0 )
     {
     }
 
@@ -701,7 +704,7 @@ namespace daisy
     /// </summary>
     /// <param name="vertices_to_add">vertices to be added to buffer</param>
     /// <param name="indices_to_add">indices to be added to buffer</param>
-    void ensure_buffers_capacity ( const uint32_t vertices_to_add, const uint32_t indices_to_add )
+    void ensure_buffers_capacity ( const uint32_t vertices_to_add, const uint32_t indices_to_add ) noexcept
     {
       // check vtxbuf
       if ( this->m_vtxs.m_size + vertices_to_add > this->m_vtxs.m_capacity )
@@ -713,17 +716,20 @@ namespace daisy
         // create new vertex buf
         void *new_vtx = malloc ( this->m_vtxs.m_capacity * sizeof ( daisy_vtx_t ) );
 
-        // copy old data over
-        memcpy ( new_vtx, this->m_vtxs.m_data, this->m_vtxs.m_size * sizeof ( daisy_vtx_t ) );
+        if ( new_vtx )
+        {
+          // copy old data over
+          memcpy ( new_vtx, this->m_vtxs.m_data, this->m_vtxs.m_size * sizeof ( daisy_vtx_t ) );
 
-        // d3d9 buf needs to be reallocated on new flush (we could do this here, however this ensures we're in the d3d9 rendering thread)
-        this->m_realloc_vtx = true;
+          // d3d9 buf needs to be reallocated on new flush (we could do this here, however this ensures we're in the d3d9 rendering thread)
+          this->m_realloc_vtx = true;
 
-        // free old data
-        free ( this->m_vtxs.m_data );
-        this->m_vtxs.m_data = new_vtx;
+          // free old data
+          free ( this->m_vtxs.m_data );
+          this->m_vtxs.m_data = new_vtx;
 
-        printf ( "realloc'd vtx buf\n" );
+          printf ( "realloc'd vtx buf\n" );
+        }
       }
 
       // check idxbuf
@@ -736,17 +742,20 @@ namespace daisy
         // create new vertex buf
         void *new_idx = malloc ( this->m_idxs.m_capacity * sizeof ( uint16_t ) );
 
-        // copy old data over
-        memcpy ( new_idx, this->m_idxs.m_data, this->m_idxs.m_size * sizeof ( uint16_t ) );
+        if ( new_idx )
+        {
+          // copy old data over
+          memcpy ( new_idx, this->m_idxs.m_data, this->m_idxs.m_size * sizeof ( uint16_t ) );
 
-        // d3d9 buf needs to be reallocated on new flush (we could do this here, however this ensures we're in the d3d9 rendering thread)
-        this->m_realloc_idx = true;
+          // d3d9 buf needs to be reallocated on new flush (we could do this here, however this ensures we're in the d3d9 rendering thread)
+          this->m_realloc_idx = true;
 
-        // free old data
-        free ( this->m_idxs.m_data );
-        this->m_idxs.m_data = new_idx;
+          // free old data
+          free ( this->m_idxs.m_data );
+          this->m_idxs.m_data = new_idx;
 
-        printf ( "realloc'd idx buf\n" );
+          printf ( "realloc'd idx buf\n" );
+        }
       }
     }
 
@@ -809,7 +818,7 @@ namespace daisy
     }
   public:
     c_renderqueue ( ) noexcept
-        : m_vertex_buffer ( nullptr ), m_index_buffer ( nullptr ), m_update ( true )
+        : m_vertex_buffer ( nullptr ), m_index_buffer ( nullptr ), m_update ( true ), m_realloc_vtx ( false ), m_realloc_idx ( false )
     {
     }
 
@@ -1158,7 +1167,7 @@ namespace daisy
     void push_text ( c_fontwrapper &font, const point_t &position, const t text, const color_t &color, uint16_t alignment = TEXT_ALIGN_DEFAULT ) noexcept
     {
       // this is a rough approximate, best we can do without passing thru the entire text twice.
-      this->ensure_buffers_capacity ( text.size ( ) * 4, text.size ( ) * 6 );
+      this->ensure_buffers_capacity ( static_cast< uint32_t > ( text.size ( ) * 4 ), static_cast< uint32_t > ( text.size ( ) * 6 ) );
 
       uint32_t additional_indices = this->begin_batch ( font.texture_handle ( ) );
       uint32_t cont_vertices = 0, cont_indices = 0, cont_primitives = 0;
