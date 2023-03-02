@@ -91,6 +91,8 @@ void my_reset_handler(IDirect3DDevice9* device) {
     iter->reset(false); 
 }
 
+// when you're done
+daisy::daisy_shutdown ( );
 ```
 a more in-depth example can be found in example/example.cc. it's heavily recommended that you read the example above and aforementioned file at least once to familiarize yourself with the library. the library itself is also robustly documented and rather straight-forward, so if you get confused feel free to read the code itself.
 

@@ -213,6 +213,8 @@ INT WINAPI WinMain (
     g_device->Present ( nullptr, nullptr, nullptr, nullptr );
   }
 
+  daisy::daisy_shutdown ( );
+
   // bail
   DestroyWindow ( hwnd );
   UnregisterClass ( wc.lpszClassName, wc.hInstance );

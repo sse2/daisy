@@ -180,8 +180,10 @@ namespace daisy
         this->m_height *= 2;
       }
 
-      D3DCAPS9 caps;
-      daisy_t::s_device->GetDeviceCaps ( &caps );
+      D3DCAPS9 caps { };
+      HRESULT res = daisy_t::s_device->GetDeviceCaps ( &caps );
+      if ( res != D3D_OK )
+        return false;
 
       // ensure our atlas isn't above max texture cap
       // @todo; use texatlas
@@ -208,7 +210,7 @@ namespace daisy
       }
 
       // create dx9 tex
-      HRESULT res = daisy_t::s_device->CreateTexture ( this->m_width, this->m_height, 1, D3DUSAGE_DYNAMIC, D3DFMT_A4R4G4B4, D3DPOOL_DEFAULT, &this->m_texture_handle, nullptr );
+      res = daisy_t::s_device->CreateTexture ( this->m_width, this->m_height, 1, D3DUSAGE_DYNAMIC, D3DFMT_A4R4G4B4, D3DPOOL_DEFAULT, &this->m_texture_handle, nullptr );
       if ( res != D3D_OK || !this->m_texture_handle )
         return false;
 
@@ -767,7 +769,7 @@ namespace daisy
       // attempt to batch drawcall
       if ( !this->m_drawcalls.empty ( ) )
       {
-        auto &last_call = this->m_drawcalls.at ( this->m_drawcalls.size ( ) - 1 );
+        auto &last_call = this->m_drawcalls.back ( );
         if ( last_call.m_kind == daisy_call_kind::CALL_TRI && last_call.m_tri.m_texture_handle == texture_handle )
         {
           // we can batch this call
@@ -803,9 +805,11 @@ namespace daisy
       // call is batched
       else
       {
-        this->m_drawcalls.at ( this->m_drawcalls.size ( ) - 1 ).m_tri.m_vertices += vertices;
-        this->m_drawcalls.at ( this->m_drawcalls.size ( ) - 1 ).m_tri.m_indices += indices;
-        this->m_drawcalls.at ( this->m_drawcalls.size ( ) - 1 ).m_tri.m_primitives += primitives;
+        auto &last_call = this->m_drawcalls.back ( );
+
+        last_call.m_tri.m_vertices += vertices;
+        last_call.m_tri.m_indices += indices;
+        last_call.m_tri.m_primitives += primitives;
       }
 
       // need to update gpu-side buffers
@@ -1337,6 +1341,7 @@ namespace daisy
   inline static void daisy_initialize ( IDirect3DDevice9* device ) noexcept
   {
     daisy_t::s_device = device;
+    daisy_t::s_device->AddRef ( );
   }
 
   /// <summary>
@@ -1390,6 +1395,15 @@ namespace daisy
 
     daisy_t::s_device->SetVertexShader ( nullptr );
     daisy_t::s_device->SetPixelShader ( nullptr );
+  }
+
+  /// <summary>
+  /// shut down daisy
+  /// </summary>
+  inline static void daisy_shutdown ( ) noexcept
+  {
+    if ( daisy_t::s_device )
+      daisy_t::s_device->Release ( );
   }
 } // namespace daisy
 
