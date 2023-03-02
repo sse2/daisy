@@ -180,8 +180,10 @@ namespace daisy
         this->m_height *= 2;
       }
 
-      D3DCAPS9 caps;
-      daisy_t::s_device->GetDeviceCaps ( &caps );
+      D3DCAPS9 caps { };
+      HRESULT res = daisy_t::s_device->GetDeviceCaps ( &caps );
+      if ( res != D3D_OK )
+        return false;
 
       // ensure our atlas isn't above max texture cap
       // @todo; use texatlas
@@ -208,7 +210,7 @@ namespace daisy
       }
 
       // create dx9 tex
-      HRESULT res = daisy_t::s_device->CreateTexture ( this->m_width, this->m_height, 1, D3DUSAGE_DYNAMIC, D3DFMT_A4R4G4B4, D3DPOOL_DEFAULT, &this->m_texture_handle, nullptr );
+      res = daisy_t::s_device->CreateTexture ( this->m_width, this->m_height, 1, D3DUSAGE_DYNAMIC, D3DFMT_A4R4G4B4, D3DPOOL_DEFAULT, &this->m_texture_handle, nullptr );
       if ( res != D3D_OK || !this->m_texture_handle )
         return false;
 
@@ -223,6 +225,9 @@ namespace daisy
       bitmap_ctx.bmiHeader.biBitCount = 32;
 
       bitmap = CreateDIBSection ( gdi_ctx, &bitmap_ctx, DIB_RGB_COLORS, reinterpret_cast< void ** > ( &bitmap_bits ), nullptr, 0 );
+      if ( !bitmap )
+        return false;
+
       prev_bitmap = SelectObject ( gdi_ctx, bitmap );
 
       SetTextColor ( gdi_ctx, RGB ( 255, 255, 255 ) );
@@ -368,7 +373,7 @@ namespace daisy
   public:
     // inits everything with 0
     c_fontwrapper ( ) noexcept
-        : m_family ( ), m_texture_handle ( nullptr ), m_scale ( 0.f ), m_width ( 0 ), m_height ( 0 ), m_spacing ( 0 ), m_size ( 0 ), m_flags ( 0 )
+        : m_family ( ), m_texture_handle ( nullptr ), m_scale ( 0.f ), m_width ( 0 ), m_height ( 0 ), m_spacing ( 0 ), m_size ( 0 ), m_quality ( NONANTIALIASED_QUALITY ), m_flags ( 0 )
     {
     }
 
@@ -692,7 +697,66 @@ namespace daisy
     // update d3d9 sided vtx/idx buffers
     bool m_update;
 
+    // reallocate d3d9 buffers
+    bool m_realloc_vtx, m_realloc_idx;
+
   private:
+    /// <summary>
+    /// ensures buffers have enough capacity for the draw call
+    /// </summary>
+    /// <param name="vertices_to_add">vertices to be added to buffer</param>
+    /// <param name="indices_to_add">indices to be added to buffer</param>
+    void ensure_buffers_capacity ( const uint32_t vertices_to_add, const uint32_t indices_to_add ) noexcept
+    {
+      // check vtxbuf
+      if ( this->m_vtxs.m_size + vertices_to_add > this->m_vtxs.m_capacity )
+      {
+        // set new capacity
+        while ( this->m_vtxs.m_size + vertices_to_add > this->m_vtxs.m_capacity )
+          this->m_vtxs.m_capacity = this->m_vtxs.m_capacity * 2;
+
+        // create new vertex buf
+        void *new_vtx = malloc ( this->m_vtxs.m_capacity * sizeof ( daisy_vtx_t ) );
+
+        if ( new_vtx )
+        {
+          // copy old data over
+          memcpy ( new_vtx, this->m_vtxs.m_data, this->m_vtxs.m_size * sizeof ( daisy_vtx_t ) );
+
+          // d3d9 buf needs to be reallocated on new flush (we could do this here, however this ensures we're in the d3d9 rendering thread)
+          this->m_realloc_vtx = true;
+
+          // free old data
+          free ( this->m_vtxs.m_data );
+          this->m_vtxs.m_data = new_vtx;
+        }
+      }
+
+      // check idxbuf
+      if ( this->m_idxs.m_size + indices_to_add > this->m_idxs.m_capacity )
+      {
+        // set capacity
+        while ( this->m_idxs.m_size + indices_to_add > this->m_idxs.m_capacity )
+          this->m_idxs.m_capacity = this->m_idxs.m_capacity * 2;
+
+        // create new vertex buf
+        void *new_idx = malloc ( this->m_idxs.m_capacity * sizeof ( uint16_t ) );
+
+        if ( new_idx )
+        {
+          // copy old data over
+          memcpy ( new_idx, this->m_idxs.m_data, this->m_idxs.m_size * sizeof ( uint16_t ) );
+
+          // d3d9 buf needs to be reallocated on new flush (we could do this here, however this ensures we're in the d3d9 rendering thread)
+          this->m_realloc_idx = true;
+
+          // free old data
+          free ( this->m_idxs.m_data );
+          this->m_idxs.m_data = new_idx;
+        }
+      }
+    }
+
     /// <summary>
     /// checks if call can be batched
     /// </summary>
@@ -705,7 +769,7 @@ namespace daisy
       // attempt to batch drawcall
       if ( !this->m_drawcalls.empty ( ) )
       {
-        auto &last_call = this->m_drawcalls.at ( this->m_drawcalls.size ( ) - 1 );
+        auto &last_call = this->m_drawcalls.back ( );
         if ( last_call.m_kind == daisy_call_kind::CALL_TRI && last_call.m_tri.m_texture_handle == texture_handle )
         {
           // we can batch this call
@@ -741,9 +805,11 @@ namespace daisy
       // call is batched
       else
       {
-        this->m_drawcalls.at ( this->m_drawcalls.size ( ) - 1 ).m_tri.m_vertices += vertices;
-        this->m_drawcalls.at ( this->m_drawcalls.size ( ) - 1 ).m_tri.m_indices += indices;
-        this->m_drawcalls.at ( this->m_drawcalls.size ( ) - 1 ).m_tri.m_primitives += primitives;
+        auto &last_call = this->m_drawcalls.back ( );
+
+        last_call.m_tri.m_vertices += vertices;
+        last_call.m_tri.m_indices += indices;
+        last_call.m_tri.m_primitives += primitives;
       }
 
       // need to update gpu-side buffers
@@ -752,7 +818,7 @@ namespace daisy
     }
   public:
     c_renderqueue ( ) noexcept
-        : m_vertex_buffer ( nullptr ), m_index_buffer ( nullptr ), m_update ( true )
+        : m_vertex_buffer ( nullptr ), m_index_buffer ( nullptr ), m_update ( true ), m_realloc_vtx ( false ), m_realloc_idx ( false )
     {
     }
 
@@ -825,10 +891,16 @@ namespace daisy
       else
       {
         if ( this->m_vertex_buffer )
+        {
           this->m_vertex_buffer->Release ( );
+          this->m_vertex_buffer = nullptr;
+        }
 
         if ( this->m_index_buffer )
+        {
           this->m_index_buffer->Release ( );
+          this->m_index_buffer = nullptr;
+        }
       }
 
       return true;
@@ -839,6 +911,30 @@ namespace daisy
     /// </summary>
     void update ( ) noexcept
     {
+      if ( !daisy_t::s_device )
+        return;
+
+      // checking realloc
+      if ( this->m_realloc_vtx )
+      {
+        this->m_vertex_buffer->Release ( );
+
+        if ( daisy_t::s_device->CreateVertexBuffer ( static_cast< UINT > ( this->m_vtxs.m_capacity * sizeof ( daisy_vtx_t ) ), D3DUSAGE_DYNAMIC | D3DUSAGE_WRITEONLY, ( D3DFVF_XYZRHW | D3DFVF_DIFFUSE | D3DFVF_TEX1 ), D3DPOOL_DEFAULT, &this->m_vertex_buffer, nullptr ) < 0 )
+          return;
+
+        this->m_realloc_vtx = false;
+      }
+
+      if ( this->m_realloc_idx )
+      {
+        this->m_index_buffer->Release ( );
+
+        if ( daisy_t::s_device->CreateIndexBuffer ( static_cast< UINT > ( this->m_idxs.m_capacity * sizeof ( uint16_t ) ), D3DUSAGE_DYNAMIC | D3DUSAGE_WRITEONLY, D3DFMT_INDEX16, D3DPOOL_DEFAULT, &this->m_index_buffer, nullptr ) < 0 )
+          return;
+
+        this->m_realloc_idx = false;
+      }
+
       daisy_vtx_t *vert;
       uint16_t *indx;
 
@@ -942,6 +1038,8 @@ namespace daisy
     /// <param name="uv_maxs">uv maxs of rectangle in texture (by default {1, 1})</param>
     void push_gradient_rectangle ( const point_t &position, const point_t &size, const color_t c1, const color_t c2, const color_t c3, const color_t c4, IDirect3DTexture9 *texture_handle = nullptr, const point_t &uv_mins = { 0.f, 0.f }, const point_t &uv_maxs = { 1.f, 1.f } ) noexcept
     {
+      this->ensure_buffers_capacity ( 4 , 6 );
+
       uint32_t additional_indices = this->begin_batch ( texture_handle );
 
       daisy_vtx_t vtx[] = { daisy_vtx_t { { floorf ( position.x ), floorf ( position.y ), 0.0f, 1.f }, c1.bgra, { uv_mins.x, uv_mins.y } },                   // top-left
@@ -994,6 +1092,8 @@ namespace daisy
     /// <param name="uv3">uv bounds for the 3rd point</param>
     void push_filled_triangle ( const point_t &p1, const point_t &p2, const point_t &p3, const color_t c1, const color_t c2, const color_t c3, IDirect3DTexture9 *texture_handle = nullptr, const point_t &uv1 = { 0.f, 0.f }, const point_t &uv2 = { 0.f, 0.f }, const point_t &uv3 = { 0.f, 0.f } ) noexcept
     {
+      this->ensure_buffers_capacity ( 3, 3 );
+
       uint32_t additional_indices = this->begin_batch ( texture_handle );
 
       daisy_vtx_t vtx[] = { daisy_vtx_t { { floorf ( p1.x ), floorf ( p1.y ), 0.0f, 1.f }, c1.bgra, { uv1.x, uv1.y } },
@@ -1022,6 +1122,8 @@ namespace daisy
     /// <param name="width">width of line</param>
     void push_line ( const point_t &p1, const point_t &p2, const color_t &col, const float width = 1.f ) noexcept
     {
+      this->ensure_buffers_capacity ( 4, 6 );
+
       uint32_t additional_indices = this->begin_batch ( nullptr );
 
       // shoutout 8th grade math
@@ -1064,6 +1166,9 @@ namespace daisy
     template<typename t = std::string_view>
     void push_text ( c_fontwrapper &font, const point_t &position, const t text, const color_t &color, uint16_t alignment = TEXT_ALIGN_DEFAULT ) noexcept
     {
+      // this is a rough approximate, best we can do without passing thru the entire text twice.
+      this->ensure_buffers_capacity ( static_cast< uint32_t > ( text.size ( ) * 4 ), static_cast< uint32_t > ( text.size ( ) * 6 ) );
+
       uint32_t additional_indices = this->begin_batch ( font.texture_handle ( ) );
       uint32_t cont_vertices = 0, cont_indices = 0, cont_primitives = 0;
 
@@ -1236,6 +1341,7 @@ namespace daisy
   inline static void daisy_initialize ( IDirect3DDevice9* device ) noexcept
   {
     daisy_t::s_device = device;
+    daisy_t::s_device->AddRef ( );
   }
 
   /// <summary>
@@ -1289,6 +1395,15 @@ namespace daisy
 
     daisy_t::s_device->SetVertexShader ( nullptr );
     daisy_t::s_device->SetPixelShader ( nullptr );
+  }
+
+  /// <summary>
+  /// shut down daisy
+  /// </summary>
+  inline static void daisy_shutdown ( ) noexcept
+  {
+    if ( daisy_t::s_device )
+      daisy_t::s_device->Release ( );
   }
 } // namespace daisy
 

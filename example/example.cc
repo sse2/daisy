@@ -97,7 +97,7 @@ INT WINAPI WinMain (
 
   // create a normal queue
   daisy::c_renderqueue queue;
-  if ( !queue.create ( ) )
+  if ( !queue.create ( 32, 64 ) )
     return EXIT_FAILURE;
 
   // create a double buffer queue (you can fill this from a non-rendering thread safely)
@@ -212,6 +212,8 @@ INT WINAPI WinMain (
     g_device->EndScene ( );
     g_device->Present ( nullptr, nullptr, nullptr, nullptr );
   }
+
+  daisy::daisy_shutdown ( );
 
   // bail
   DestroyWindow ( hwnd );
