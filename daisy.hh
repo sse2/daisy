@@ -727,8 +727,6 @@ namespace daisy
           // free old data
           free ( this->m_vtxs.m_data );
           this->m_vtxs.m_data = new_vtx;
-
-          printf ( "realloc'd vtx buf\n" );
         }
       }
 
@@ -753,8 +751,6 @@ namespace daisy
           // free old data
           free ( this->m_idxs.m_data );
           this->m_idxs.m_data = new_idx;
-
-          printf ( "realloc'd idx buf\n" );
         }
       }
     }
