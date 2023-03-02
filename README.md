@@ -106,7 +106,7 @@ some things you might want to take into consideration before using daisy:
  
  there's also a couple of drawbacks to using daisy, but i'm planning on fixing these eventually. nevertheless, the following are currently an issue (pull requests are welcome!):
 
-- ~~vertex and index buffers and texture atlases don't dynamically grow/shrink in size.~~ (see [this branch](https://github.com/sse2/daisy/tree/dynamic_buffers)) 
+- ~~vertex and index buffers and texture atlases don't dynamically grow/shrink in size.~~ added!
 - each font currently has it's own texture atlas instead of using a shared one (this will be fixed soon) 
 - the render queue API should (and will) be expanded with more primitives to draw (currently we have filled rectangles, filled triangles, lines, text.. and that's about it)
 - font initialization takes a while.
