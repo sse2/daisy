@@ -193,7 +193,7 @@ INT WINAPI WinMain (
     queue.push_gradient_rectangle ( { 0, 0 }, { 1280, 800 }, { 255, 255, 255, 36 }, { 255, 0, 0, 36 }, { 0, 255, 0, 36 }, { 0, 0, 255, 36 } );
 
     // push some wide text
-    queue.push_text< std::wstring_view > ( font_gothic, { 10, 10 }, L"this is a test for wide text! 朋友你好!", { 255, 255, 255, 192 } );
+    queue.push_text< std::wstring_view > ( font_gothic, { 10, 10 }, L"this is a test for wide text! 朋友你好!\nthis is a test for wide text! 朋友你好!\nthis is a test for wide text! 朋友你好!", { 255, 255, 255, 192 } );
 
     // push some ascii text
     queue.push_text< std::string_view > ( font_logo, { 1280 / 2, 800 / 2 + 50 * sinf ( realtime * 3.f ) }, "this ascii text is at the center of the window. also, it has a different font!", { 255, 255, 255, 255 }, daisy::TEXT_ALIGNX_CENTER | daisy::TEXT_ALIGNY_CENTER );

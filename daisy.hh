@@ -408,21 +408,10 @@ namespace daisy
 
       for ( const auto c : text )
       {
-        if constexpr ( sizeof ( c ) == sizeof ( char ) )
+        if ( c == '\n' )
         {
-          if ( c == '\n' )
-          {
-            row_width = 0.f;
-            height += row_height;
-          }
-        }
-        else
-        {
-          if ( c == L'\n' )
-          {
-            row_width = 0.f;
-            height += row_height;
-          }
+          row_width = 0.f;
+          height += row_height;
         }
 
         if ( c < ' ' )
@@ -1188,39 +1177,18 @@ namespace daisy
 
       for ( const auto c : text )
       {
-        bool is_space = false;
-
-        if constexpr ( sizeof ( c ) == sizeof ( char ) )
+        if ( c == '\n' )
         {
-          if ( c == '\n' )
-          {
-            corrected_position.x = start_x;
-            corrected_position.y += ( space_coords[ 3 ] - space_coords[ 1 ] ) * font.height ( );
+          corrected_position.x = start_x;
+          corrected_position.y += ( space_coords[ 3 ] - space_coords[ 1 ] ) * font.height ( );
 
-            continue;
-          }
-
-          if ( c < ' ' )
-            continue;
-
-          is_space = c == ' ';
-        }
-        else
-        {
-          if ( c == L'\n' )
-          {
-            corrected_position.x = start_x;
-            corrected_position.y += ( space_coords[ 3 ] - space_coords[ 1 ] ) * font.height ( );
-
-            continue;
-          }
-
-          if ( c < L' ' )
-            continue;
-
-          is_space = c == L' ';
+          continue;
         }
 
+        if ( c < ' ' )
+          continue;
+
+        auto is_space = ( c == ' ' );
         auto coords = font.coords ( c );
 
         float tx1 = coords[ 0 ];
