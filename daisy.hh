@@ -1186,6 +1186,70 @@ namespace daisy
     }
 
     /// <summary>
+    /// push filled circle to drawlist
+    /// to note: it would be more efficient to use a pixel shader and draw a quad to draw the circle
+    /// </summary>
+    /// <param name="center">center of circle</param>
+    /// <param name="radius">radius of circle</param>
+    /// <param name="segments">how many points are used to draw the circle (less = circle is less accurate, more = more vertices and indicies used, increased memory usage, slower to compute)</param>
+    /// <param name="center_color">the color of the center of the circle</param>
+    /// <param name="outer_color">the color of the outside of the circle</param>
+    void push_filled_circle ( const point_t &center, const float radius, const int segments, const color_t &center_color, const color_t &outer_color )
+    {
+      this->ensure_buffers_capacity ( static_cast< uint32_t > ( segments + 1 ), static_cast< uint32_t > ( segments * 3 ) );
+
+      constexpr static auto PI = 3.14159265358979323846f;
+      constexpr static auto PI2 = PI * PI;
+
+      uint32_t additional_indices = this->begin_batch ( nullptr );
+
+      auto vtx_counter = 0, idx_counter = 0;
+
+      // write directly to the end of the buffer as we know we have more than enough space - need to start doing this everywhere
+      daisy_vtx_t *vtx = reinterpret_cast< daisy_vtx_t * > ( reinterpret_cast< uintptr_t > ( this->m_vtxs.m_data.get ( ) ) + ( sizeof ( daisy_vtx_t ) * this->m_vtxs.m_size ) );
+      uint16_t *idx = reinterpret_cast< uint16_t * > ( reinterpret_cast< uintptr_t > ( this->m_idxs.m_data.get ( ) ) + ( sizeof ( uint16_t ) * this->m_idxs.m_size ) );
+
+      // center point
+      vtx[ vtx_counter++ ] = daisy_vtx_t { { center.x, center.y, 0.0f, 1.f }, center_color.bgra, { 0.f, 0.f } };
+
+      // outer points
+      for ( int i = 0; i <= segments; ++i )
+      {
+        float theta = ( 2.f * PI2 * i ) / segments;
+        float x = center.x + radius * cosf ( theta );
+        float y = center.y + radius * sinf ( theta );
+
+        auto last_iteration = ( i == segments );
+
+        // we save a vertex here
+        if ( !last_iteration )
+          vtx[ vtx_counter++ ] = daisy_vtx_t { { x, y, 0.0f, 1.f }, outer_color.bgra, { 0.f, 0.f } };
+
+        // don't do this for the first point as we have no previous point to connect to, we run an extra iteration to connect the last point to the first at the end
+        if ( i )
+        {
+          idx[ idx_counter++ ] = static_cast< uint16_t > ( additional_indices ); // center point
+
+          if ( last_iteration )
+          {
+            idx[ idx_counter++ ] = static_cast< uint16_t > ( additional_indices + i );     // last point
+            idx[ idx_counter++ ] = static_cast< uint16_t > ( additional_indices + 1 );     // center point
+          }
+          else
+          {
+            idx[ idx_counter++ ] = static_cast< uint16_t > ( additional_indices + i );     // last point
+            idx[ idx_counter++ ] = static_cast< uint16_t > ( additional_indices + i + 1 ); // this point
+          }
+        }
+      }
+
+      this->m_vtxs.m_size += vtx_counter;
+      this->m_idxs.m_size += idx_counter;
+
+      this->end_batch ( additional_indices, vtx_counter, idx_counter, segments, nullptr );
+    }
+
+    /// <summary>
     /// push a string with a given font to drawlist
     /// </summary>
     /// <typeparam name="t">iteratable text container (only char and wchar_t accepted currently)</typeparam>
@@ -1382,7 +1446,6 @@ namespace daisy
     daisy_t::s_device->SetRenderState ( D3DRS_FOGENABLE, FALSE );
     daisy_t::s_device->SetRenderState ( D3DRS_SRGBWRITEENABLE, FALSE );
     daisy_t::s_device->SetRenderState ( D3DRS_COLORWRITEENABLE, D3DCOLORWRITEENABLE_RED | D3DCOLORWRITEENABLE_GREEN | D3DCOLORWRITEENABLE_BLUE | D3DCOLORWRITEENABLE_ALPHA );
-    daisy_t::s_device->SetRenderState ( D3DRS_MULTISAMPLEANTIALIAS, FALSE );
     daisy_t::s_device->SetRenderState ( D3DRS_ANTIALIASEDLINEENABLE, FALSE );
 
     daisy_t::s_device->SetTextureStageState ( 0, D3DTSS_COLOROP, D3DTOP_MODULATE );

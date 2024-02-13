@@ -80,10 +80,14 @@ INT WINAPI WinMain (
   g_params.BackBufferFormat = D3DFMT_UNKNOWN;
   g_params.EnableAutoDepthStencil = TRUE;
   g_params.AutoDepthStencilFormat = D3DFMT_D16;
+  g_params.MultiSampleType = D3DMULTISAMPLE_4_SAMPLES; // added multisampling so circles look prettier - you can enable/disable this at will
   g_params.PresentationInterval = D3DPRESENT_INTERVAL_IMMEDIATE;
 
   // create d3d9 device
   g_d3d->CreateDevice ( D3DADAPTER_DEFAULT, D3DDEVTYPE_HAL, hwnd, D3DCREATE_HARDWARE_VERTEXPROCESSING, &g_params, &g_device );
+
+  // enable multisampling - example
+  g_device->SetRenderState ( D3DRS_MULTISAMPLEANTIALIAS, TRUE );
 
   // initialize the library with the d3d9 device pointer
   daisy::daisy_initialize ( g_device );
@@ -191,6 +195,12 @@ INT WINAPI WinMain (
 
     // push a filled gradient rectangle
     queue.push_gradient_rectangle ( { 0, 0 }, { 1280, 800 }, { 255, 255, 255, 36 }, { 255, 0, 0, 36 }, { 0, 255, 0, 36 }, { 0, 0, 255, 36 } );
+
+    // push two filled circles
+    queue.push_filled_circle ( { 540, 260 }, 80.f, 90, { 255, 255, 255 }, daisy::color_t::from_hsv ( fmodf ( realtime * 30.f, 360.f ), 0.6f, 1.f ) );
+
+    // lower radius, lower segment count
+    queue.push_filled_circle ( { 540, 660 }, 40.f, 60, { 255, 255, 255 }, daisy::color_t::from_hsv ( fmodf ( realtime * 30.f, 360.f ), 0.6f, 1.f ) );
 
     // push some wide text
     queue.push_text< std::wstring_view > ( font_gothic, { 10, 10 }, L"this is a test for wide text! 朋友你好!\nthis is a test for wide text! 朋友你好!\nthis is a test for wide text! 朋友你好!", { 255, 255, 255, 192 } );
