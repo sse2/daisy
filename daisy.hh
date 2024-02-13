@@ -10,7 +10,7 @@
 #include <vector>        // std::vector
 #include <array>         // std::array
 #include <atomic>        // std::atomic
-#include <memory>		 // std::unique_ptr, std::make_unique
+#include <memory>        // std::unique_ptr, std::make_unique
 #include <cstdint>       // uint/int types
 
 // d3d9
@@ -738,7 +738,7 @@ namespace daisy
         if ( new_idx )
         {
           // copy old data over
-          memcpy ( new_idx.get(), this->m_idxs.m_data.get(), this->m_idxs.m_size * sizeof ( uint16_t ) );
+          memcpy ( new_idx.get ( ), this->m_idxs.m_data.get ( ), this->m_idxs.m_size * sizeof ( uint16_t ) );
 
           // d3d9 buf needs to be reallocated on new flush (we could do this here, however this ensures we're in the d3d9 rendering thread)
           this->m_realloc_idx = true;
