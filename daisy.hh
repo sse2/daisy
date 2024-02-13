@@ -39,8 +39,8 @@ namespace daisy
     /// returns a new color based on hue, saturation and variance values
     /// </summary>
     /// <param name="hue">float between [0, 360] which represents hue of color</param>
-    /// <param name="saturation">float between [0, 1] which represents percentage of saturation</param>
-    /// <param name="variance">float between [0, 1] which represents percentage of variance</param>
+    /// <param name="saturation">float between [0, 1] which represents percentage of saturation, where 0 means desaturated (black and white) and 1 means saturated</param>
+    /// <param name="variance">float between [0, 1] which represents percentage of variance, where 0 means black and 1 means "colored"</param>
     /// <returns></returns>
     static color_t from_hsv ( float hue, float saturation, float variance )
     {

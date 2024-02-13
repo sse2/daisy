@@ -196,12 +196,12 @@ INT WINAPI WinMain (
     queue.push_text< std::wstring_view > ( font_gothic, { 10, 10 }, L"this is a test for wide text! 朋友你好!\nthis is a test for wide text! 朋友你好!\nthis is a test for wide text! 朋友你好!", { 255, 255, 255, 192 } );
 
     // push some ascii text
-    queue.push_text< std::string_view > ( font_logo, { 1280 / 2, 800 / 2 + 50 * sinf ( realtime * 3.f ) }, "this ascii text is at the center of the window. also, it has a different font!", { 255, 255, 255, 255 }, daisy::TEXT_ALIGNX_CENTER | daisy::TEXT_ALIGNY_CENTER );
-    
+    queue.push_text< std::string_view > ( font_logo, { 1280 / 2, 800 / 2 + 50 * sinf ( realtime * 3.f ) }, "this ascii text is at the center of the window. also, it has a different font!", daisy::color_t::from_hsv ( fmodf ( realtime * 30.f, 360.f ), 0.6f, 1.f ), daisy::TEXT_ALIGNX_CENTER | daisy::TEXT_ALIGNY_CENTER );
+
     // push the daisy logo from the texture atlas
     auto daisy_image_coords = atlas.coords ( 1 );
     queue.push_filled_rectangle ( { 500 + 20 * sinf ( realtime * 3.f ), 100 + 20 * sinf ( realtime * 3.f ) }, { 448 + 20 * sinf ( realtime * 3.f ), 93 + 4 * sinf ( realtime * 3.f ) }, { 255, 255, 255 }, atlas.texture_handle ( ), { daisy_image_coords[ 0 ], daisy_image_coords[ 1 ] }, { daisy_image_coords[ 2 ], daisy_image_coords[ 3 ] } );
-    
+
     // flushing of all render queues should happen here
     queue.flush ( );
     double_buffer_queue.flush ( );
