@@ -6,12 +6,13 @@
 
 // stl includes
 #include <unordered_map> // std::unordered_map
-#include <string_view> // std::string_view
-#include <vector> // std::vector
-#include <array> // std::array
-#include <atomic> // std::atomic
-#include <cstdint> // uint/int types
- 
+#include <string_view>   // std::string_view
+#include <vector>        // std::vector
+#include <array>         // std::array
+#include <atomic>        // std::atomic
+#include <memory>        // std::unique_ptr, std::make_unique
+#include <cstdint>       // uint/int types
+
 // d3d9
 #include <d3d9.h>
 
@@ -33,6 +34,56 @@ namespace daisy
         : chan ( { _b, _g, _r, _a } )
     {
     }
+
+    /// <summary>
+    /// returns a new color based on hue, saturation and variance values
+    /// </summary>
+    /// <param name="hue">float between [0, 360] which represents hue of color</param>
+    /// <param name="saturation">float between [0, 1] which represents percentage of saturation, where 0 means desaturated (black and white) and 1 means saturated</param>
+    /// <param name="variance">float between [0, 1] which represents percentage of variance, where 0 means black and 1 means "colored"</param>
+    /// <returns></returns>
+    static color_t from_hsv ( float hue, float saturation, float variance )
+    {
+      color_t ret;
+
+      float C = saturation * variance;
+      float X = C * ( 1 - fabsf ( fmodf ( hue / 60.f, 2 ) - 1 ) );
+      float m = variance - C;
+
+      float r, g, b;
+
+      if ( hue >= 0.f && hue < 60.f )
+      {
+        r = C, g = X, b = 0.f;
+      }
+      else if ( hue >= 60.f && hue < 120.f )
+      {
+        r = X, g = C, b = 0.f;
+      }
+      else if ( hue >= 120.f && hue < 180 )
+      {
+        r = 0.f, g = C, b = X;
+      }
+      else if ( hue >= 180.f && hue < 240.f )
+      {
+        r = 0.f, g = X, b = C;
+      }
+      else if ( hue >= 240.f && hue < 300.f )
+      {
+        r = X, g = 0.f, b = C;
+      }
+      else
+      {
+        r = C, g = 0.f, b = X;
+      }
+
+      ret.chan.r = static_cast< unsigned char > ( ( r + m ) * 255 );
+      ret.chan.g = static_cast< unsigned char > ( ( g + m ) * 255 );
+      ret.chan.b = static_cast< unsigned char > ( ( b + m ) * 255 );
+      ret.chan.a = 255;
+
+      return ret;
+    }
   };
 
   // our vertex struct
@@ -46,7 +97,7 @@ namespace daisy
   // buffer
   struct renderbuffer_t
   {
-    void *m_data { nullptr };
+    std::unique_ptr< uint8_t[] > m_data { nullptr };
     uint32_t m_capacity { 0 }, m_size { 0 };
   };
 
@@ -308,16 +359,14 @@ namespace daisy
       if ( !unicode_ranges_size )
         return 1;
 
-      // @todo; we're in c++ let's not use malloc... clogs up code
-      GLYPHSET *glyph_sets = ( GLYPHSET * ) malloc ( unicode_ranges_size );
-      if ( !glyph_sets )
+      auto glyph_sets_memory = std::make_unique< uint8_t[] > ( unicode_ranges_size );
+      if ( !glyph_sets_memory )
         return 1;
 
+      auto glyph_sets = reinterpret_cast< GLYPHSET * > ( glyph_sets_memory.get ( ) );
+
       if ( !GetFontUnicodeRanges ( context, glyph_sets ) )
-      {
-        free ( glyph_sets );
         return 1;
-      }
 
       this->m_spacing = static_cast< uint32_t > ( ceil ( size.cy * 0.3f ) );
 
@@ -342,18 +391,12 @@ namespace daisy
 
           // ran out of space in texture
           if ( y + size.cy > this->m_height )
-          {
-            free ( glyph_sets );
             return 2;
-          }
 
           if ( !measure )
           {
             if ( !ExtTextOutW ( context, x + 0, y + 0, ETO_OPAQUE, nullptr, &ch, 1, nullptr ) )
-            {
-              free ( glyph_sets );
               return 1;
-            }
 
             this->m_coords[ static_cast< uint16_t > ( ch ) ][ 0 ] = ( static_cast< float > ( x + 0 - this->m_spacing ) ) / this->m_width;
             this->m_coords[ static_cast< uint16_t > ( ch ) ][ 1 ] = ( static_cast< float > ( y + 0 + 0 ) ) / this->m_height;
@@ -364,8 +407,6 @@ namespace daisy
           x += size.cx + ( 2 * this->m_spacing );
         }
       }
-
-      free ( glyph_sets );
 
       return 0;
     }
@@ -417,21 +458,10 @@ namespace daisy
 
       for ( const auto c : text )
       {
-        if constexpr ( sizeof ( c ) == sizeof ( char ) )
+        if ( c == '\n' )
         {
-          if ( c == '\n' )
-          {
-            row_width = 0.f;
-            height += row_height;
-          }
-        }
-        else
-        {
-          if ( c == L'\n' )
-          {
-            row_width = 0.f;
-            height += row_height;
-          }
+          row_width = 0.f;
+          height += row_height;
         }
 
         if ( c < ' ' )
@@ -606,6 +636,9 @@ namespace daisy
     /// <returns>true on success, false otherwise</returns>
     bool append ( const uint32_t uuid, const point_t &dimensions, uint8_t *tex_data, uint32_t tex_size ) noexcept
     {
+      if ( !tex_data || !tex_size )
+        return false;
+
       // go down if not enough space left
       if ( this->m_cursor.x + dimensions.x > this->m_dimensions.x )
       {
@@ -716,19 +749,18 @@ namespace daisy
           this->m_vtxs.m_capacity = this->m_vtxs.m_capacity * 2;
 
         // create new vertex buf
-        void *new_vtx = malloc ( this->m_vtxs.m_capacity * sizeof ( daisy_vtx_t ) );
+        auto new_vtx = std::make_unique< uint8_t[] > ( this->m_vtxs.m_capacity * sizeof ( daisy_vtx_t ) );
 
         if ( new_vtx )
         {
           // copy old data over
-          memcpy ( new_vtx, this->m_vtxs.m_data, this->m_vtxs.m_size * sizeof ( daisy_vtx_t ) );
+          memcpy ( new_vtx.get ( ), this->m_vtxs.m_data.get ( ), this->m_vtxs.m_size * sizeof ( daisy_vtx_t ) );
 
           // d3d9 buf needs to be reallocated on new flush (we could do this here, however this ensures we're in the d3d9 rendering thread)
           this->m_realloc_vtx = true;
 
-          // free old data
-          free ( this->m_vtxs.m_data );
-          this->m_vtxs.m_data = new_vtx;
+          // replace old data
+          this->m_vtxs.m_data.swap ( new_vtx );
         }
       }
 
@@ -740,19 +772,18 @@ namespace daisy
           this->m_idxs.m_capacity = this->m_idxs.m_capacity * 2;
 
         // create new vertex buf
-        void *new_idx = malloc ( this->m_idxs.m_capacity * sizeof ( uint16_t ) );
+        auto new_idx = std::make_unique< uint8_t[] > ( this->m_idxs.m_capacity * sizeof ( uint16_t ) );
 
         if ( new_idx )
         {
           // copy old data over
-          memcpy ( new_idx, this->m_idxs.m_data, this->m_idxs.m_size * sizeof ( uint16_t ) );
+          memcpy ( new_idx.get ( ), this->m_idxs.m_data.get ( ), this->m_idxs.m_size * sizeof ( uint16_t ) );
 
           // d3d9 buf needs to be reallocated on new flush (we could do this here, however this ensures we're in the d3d9 rendering thread)
           this->m_realloc_idx = true;
 
-          // free old data
-          free ( this->m_idxs.m_data );
-          this->m_idxs.m_data = new_idx;
+          // replace old data
+          this->m_idxs.m_data.swap ( new_idx );
         }
       }
     }
@@ -814,8 +845,8 @@ namespace daisy
 
       // need to update gpu-side buffers
       this->m_update = true;
-
     }
+
   public:
     c_renderqueue ( ) noexcept
         : m_vertex_buffer ( nullptr ), m_index_buffer ( nullptr ), m_update ( true ), m_realloc_vtx ( false ), m_realloc_idx ( false )
@@ -832,7 +863,7 @@ namespace daisy
     /// <param name="max_verts">max capacity of vertex buffer</param>
     /// <param name="max_indices">max capacity of index buffer</param>
     /// <returns>true on success, false otherwise</returns>
-    [[nodiscard]] bool create ( const uint32_t max_verts = 32767, const uint32_t max_indices = 65535 ) noexcept 
+    [[nodiscard]] bool create ( const uint32_t max_verts = 32767, const uint32_t max_indices = 65535 ) noexcept
     {
       if ( !daisy_t::s_device )
         return false;
@@ -847,16 +878,16 @@ namespace daisy
           return false;
 
       // create local buffers
-      if ( !this->m_vtxs.m_data )
+      if ( !this->m_vtxs.m_data.get ( ) )
       {
-        this->m_vtxs.m_data = malloc ( sizeof ( daisy_vtx_t ) * max_verts );
+        this->m_vtxs.m_data = std::make_unique< uint8_t[] > ( sizeof ( daisy_vtx_t ) * max_verts );
         this->m_vtxs.m_capacity = max_verts;
         this->m_vtxs.m_size = 0;
       }
 
       if ( !this->m_idxs.m_data )
       {
-        this->m_idxs.m_data = malloc ( sizeof ( uint16_t ) * max_indices );
+        this->m_idxs.m_data = std::make_unique< uint8_t[] > ( sizeof ( uint16_t ) * max_indices );
         this->m_idxs.m_capacity = max_indices;
         this->m_idxs.m_size = 0;
       }
@@ -949,8 +980,8 @@ namespace daisy
       }
 
       // we can just memcpy these
-      memcpy ( vert, this->m_vtxs.m_data, sizeof ( daisy_vtx_t ) * this->m_vtxs.m_size );
-      memcpy ( indx, this->m_idxs.m_data, sizeof ( uint16_t ) * this->m_idxs.m_size );
+      memcpy ( vert, this->m_vtxs.m_data.get ( ), sizeof ( daisy_vtx_t ) * this->m_vtxs.m_size );
+      memcpy ( indx, this->m_idxs.m_data.get ( ), sizeof ( uint16_t ) * this->m_idxs.m_size );
 
       // unlock and ret
       this->m_vertex_buffer->Unlock ( );
@@ -1038,7 +1069,7 @@ namespace daisy
     /// <param name="uv_maxs">uv maxs of rectangle in texture (by default {1, 1})</param>
     void push_gradient_rectangle ( const point_t &position, const point_t &size, const color_t c1, const color_t c2, const color_t c3, const color_t c4, IDirect3DTexture9 *texture_handle = nullptr, const point_t &uv_mins = { 0.f, 0.f }, const point_t &uv_maxs = { 1.f, 1.f } ) noexcept
     {
-      this->ensure_buffers_capacity ( 4 , 6 );
+      this->ensure_buffers_capacity ( 4, 6 );
 
       uint32_t additional_indices = this->begin_batch ( texture_handle );
 
@@ -1054,8 +1085,8 @@ namespace daisy
                           static_cast< uint16_t > ( additional_indices + 2 ),
                           static_cast< uint16_t > ( additional_indices + 1 ) };
 
-      memcpy ( reinterpret_cast< void * > ( reinterpret_cast< uintptr_t > ( this->m_vtxs.m_data ) + ( sizeof ( daisy_vtx_t ) * this->m_vtxs.m_size ) ), &vtx, sizeof ( daisy_vtx_t ) * 4 );
-      memcpy ( reinterpret_cast< void * > ( reinterpret_cast< uintptr_t > ( this->m_idxs.m_data ) + ( sizeof ( uint16_t ) * this->m_idxs.m_size ) ), &idxs, sizeof ( uint16_t ) * 6 );
+      memcpy ( reinterpret_cast< void * > ( reinterpret_cast< uintptr_t > ( this->m_vtxs.m_data.get ( ) ) + ( sizeof ( daisy_vtx_t ) * this->m_vtxs.m_size ) ), &vtx, sizeof ( daisy_vtx_t ) * 4 );
+      memcpy ( reinterpret_cast< void * > ( reinterpret_cast< uintptr_t > ( this->m_idxs.m_data.get ( ) ) + ( sizeof ( uint16_t ) * this->m_idxs.m_size ) ), &idxs, sizeof ( uint16_t ) * 6 );
 
       this->m_vtxs.m_size += 4;
       this->m_idxs.m_size += 6;
@@ -1104,8 +1135,8 @@ namespace daisy
                           static_cast< uint16_t > ( additional_indices + 1 ),
                           static_cast< uint16_t > ( additional_indices + 2 ) };
 
-      memcpy ( reinterpret_cast< void * > ( reinterpret_cast< uintptr_t > ( this->m_vtxs.m_data ) + ( sizeof ( daisy_vtx_t ) * this->m_vtxs.m_size ) ), &vtx, sizeof ( daisy_vtx_t ) * 3 );
-      memcpy ( reinterpret_cast< void * > ( reinterpret_cast< uintptr_t > ( this->m_idxs.m_data ) + ( sizeof ( uint16_t ) * this->m_idxs.m_size ) ), &idxs, sizeof ( uint16_t ) * 3 );
+      memcpy ( reinterpret_cast< void * > ( reinterpret_cast< uintptr_t > ( this->m_vtxs.m_data.get ( ) ) + ( sizeof ( daisy_vtx_t ) * this->m_vtxs.m_size ) ), &vtx, sizeof ( daisy_vtx_t ) * 3 );
+      memcpy ( reinterpret_cast< void * > ( reinterpret_cast< uintptr_t > ( this->m_idxs.m_data.get ( ) ) + ( sizeof ( uint16_t ) * this->m_idxs.m_size ) ), &idxs, sizeof ( uint16_t ) * 3 );
 
       this->m_vtxs.m_size += 3;
       this->m_idxs.m_size += 3;
@@ -1127,7 +1158,7 @@ namespace daisy
       uint32_t additional_indices = this->begin_batch ( nullptr );
 
       // shoutout 8th grade math
-      point_t delta = { p2.x - p1.x , p2.y - p1.y };
+      point_t delta = { p2.x - p1.x, p2.y - p1.y };
       float length = sqrtf ( delta.x * delta.x + delta.y * delta.y ) + FLT_EPSILON;
 
       float scale = width / ( 2.f * length );
@@ -1145,8 +1176,8 @@ namespace daisy
                           static_cast< uint16_t > ( additional_indices + 3 ),
                           static_cast< uint16_t > ( additional_indices + 1 ) };
 
-      memcpy ( reinterpret_cast< void * > ( reinterpret_cast< uintptr_t > ( this->m_vtxs.m_data ) + ( sizeof ( daisy_vtx_t ) * this->m_vtxs.m_size ) ), &vtx, sizeof ( daisy_vtx_t ) * 4 );
-      memcpy ( reinterpret_cast< void * > ( reinterpret_cast< uintptr_t > ( this->m_idxs.m_data ) + ( sizeof ( uint16_t ) * this->m_idxs.m_size ) ), &idxs, sizeof ( uint16_t ) * 6 );
+      memcpy ( reinterpret_cast< void * > ( reinterpret_cast< uintptr_t > ( this->m_vtxs.m_data.get ( ) ) + ( sizeof ( daisy_vtx_t ) * this->m_vtxs.m_size ) ), &vtx, sizeof ( daisy_vtx_t ) * 4 );
+      memcpy ( reinterpret_cast< void * > ( reinterpret_cast< uintptr_t > ( this->m_idxs.m_data.get ( ) ) + ( sizeof ( uint16_t ) * this->m_idxs.m_size ) ), &idxs, sizeof ( uint16_t ) * 6 );
 
       this->m_vtxs.m_size += 4;
       this->m_idxs.m_size += 6;
@@ -1163,7 +1194,7 @@ namespace daisy
     /// <param name="text">text to draw</param>
     /// <param name="color">color of text to draw</param>
     /// <param name="alignment">alignment of text to draw</param>
-    template<typename t = std::string_view>
+    template < typename t = std::string_view >
     void push_text ( c_fontwrapper &font, const point_t &position, const t text, const color_t &color, uint16_t alignment = TEXT_ALIGN_DEFAULT ) noexcept
     {
       // this is a rough approximate, best we can do without passing thru the entire text twice.
@@ -1196,39 +1227,18 @@ namespace daisy
 
       for ( const auto c : text )
       {
-        bool is_space = false;
-
-        if constexpr ( sizeof ( c ) == sizeof ( char ) )
+        if ( c == '\n' )
         {
-          if ( c == '\n' )
-          {
-            corrected_position.x = start_x;
-            corrected_position.y += ( space_coords[ 3 ] - space_coords[ 1 ] ) * font.height ( );
+          corrected_position.x = start_x;
+          corrected_position.y += ( space_coords[ 3 ] - space_coords[ 1 ] ) * font.height ( );
 
-            continue;
-          }
-
-          if ( c < ' ' )
-            continue;
-
-          is_space = c == ' ';
-        }
-        else
-        {
-          if ( c == L'\n' )
-          {
-            corrected_position.x = start_x;
-            corrected_position.y += ( space_coords[ 3 ] - space_coords[ 1 ] ) * font.height ( );
-
-            continue;
-          }
-
-          if ( c < L' ' )
-            continue;
-
-          is_space = c == L' ';
+          continue;
         }
 
+        if ( c < ' ' )
+          continue;
+
+        auto is_space = ( c == ' ' );
         auto coords = font.coords ( c );
 
         float tx1 = coords[ 0 ];
@@ -1236,7 +1246,7 @@ namespace daisy
         float tx2 = coords[ 2 ];
         float ty2 = coords[ 3 ];
 
-        float w = ( tx2 - tx1 ) * font.width() / font.scale();
+        float w = ( tx2 - tx1 ) * font.width ( ) / font.scale ( );
         float h = ( ty2 - ty1 ) * font.height ( ) / font.scale ( );
 
         if ( !is_space )
@@ -1256,8 +1266,8 @@ namespace daisy
               static_cast< uint16_t > ( additional_indices + cont_vertices + 1 ),
           };
 
-          memcpy ( reinterpret_cast< void * > ( reinterpret_cast< uintptr_t > ( this->m_vtxs.m_data ) + ( sizeof ( daisy_vtx_t ) * this->m_vtxs.m_size ) ), &v, sizeof ( daisy_vtx_t ) * 4 );
-          memcpy ( reinterpret_cast< void * > ( reinterpret_cast< uintptr_t > ( this->m_idxs.m_data ) + ( sizeof ( uint16_t ) * this->m_idxs.m_size ) ), &idxs, sizeof ( uint16_t ) * 6 );
+          memcpy ( reinterpret_cast< void * > ( reinterpret_cast< uintptr_t > ( this->m_vtxs.m_data.get ( ) ) + ( sizeof ( daisy_vtx_t ) * this->m_vtxs.m_size ) ), &v, sizeof ( daisy_vtx_t ) * 4 );
+          memcpy ( reinterpret_cast< void * > ( reinterpret_cast< uintptr_t > ( this->m_idxs.m_data.get ( ) ) + ( sizeof ( uint16_t ) * this->m_idxs.m_size ) ), &idxs, sizeof ( uint16_t ) * 6 );
 
           this->m_vtxs.m_size += 4;
           this->m_idxs.m_size += 6;
@@ -1307,7 +1317,7 @@ namespace daisy
     {
       return this->m_front_queue.reset ( pre_reset ) && this->m_back_queue.reset ( pre_reset );
     }
-    
+
     /// <summary>
     /// swap back and front drawlists
     /// </summary>
@@ -1338,7 +1348,7 @@ namespace daisy
   /// initializes daisy
   /// </summary>
   /// <param name="device">d3d9 device handle</param>
-  inline static void daisy_initialize ( IDirect3DDevice9* device ) noexcept
+  inline static void daisy_initialize ( IDirect3DDevice9 *device ) noexcept
   {
     daisy_t::s_device = device;
     daisy_t::s_device->AddRef ( );
