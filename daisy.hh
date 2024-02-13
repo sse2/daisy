@@ -34,6 +34,56 @@ namespace daisy
         : chan ( { _b, _g, _r, _a } )
     {
     }
+
+    /// <summary>
+    /// returns a new color based on hue, saturation and variance values
+    /// </summary>
+    /// <param name="hue">float between [0, 360] which represents hue of color</param>
+    /// <param name="saturation">float between [0, 1] which represents percentage of saturation</param>
+    /// <param name="variance">float between [0, 1] which represents percentage of variance</param>
+    /// <returns></returns>
+    static color_t from_hsv ( float hue, float saturation, float variance )
+    {
+      color_t ret;
+
+      float C = saturation * variance;
+      float X = C * ( 1 - fabsf ( fmodf ( hue / 60.f, 2 ) - 1 ) );
+      float m = variance - C;
+
+      float r, g, b;
+
+      if ( hue >= 0.f && hue < 60.f )
+      {
+        r = C, g = X, b = 0.f;
+      }
+      else if ( hue >= 60.f && hue < 120.f )
+      {
+        r = X, g = C, b = 0.f;
+      }
+      else if ( hue >= 120.f && hue < 180 )
+      {
+        r = 0.f, g = C, b = X;
+      }
+      else if ( hue >= 180.f && hue < 240.f )
+      {
+        r = 0.f, g = X, b = C;
+      }
+      else if ( hue >= 240.f && hue < 300.f )
+      {
+        r = X, g = 0.f, b = C;
+      }
+      else
+      {
+        r = C, g = 0.f, b = X;
+      }
+
+      ret.chan.r = static_cast< unsigned char > ( ( r + m ) * 255 );
+      ret.chan.g = static_cast< unsigned char > ( ( g + m ) * 255 );
+      ret.chan.b = static_cast< unsigned char > ( ( b + m ) * 255 );
+      ret.chan.a = 255;
+
+      return ret;
+    }
   };
 
   // our vertex struct
