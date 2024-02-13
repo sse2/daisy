@@ -10,6 +10,7 @@
 #include <vector>        // std::vector
 #include <array>         // std::array
 #include <atomic>        // std::atomic
+#include <memory>		 // std::unique_ptr, std::make_unique
 #include <cstdint>       // uint/int types
 
 // d3d9
@@ -46,7 +47,7 @@ namespace daisy
   // buffer
   struct renderbuffer_t
   {
-    void *m_data { nullptr };
+    std::unique_ptr< uint8_t[] > m_data { nullptr };
     uint32_t m_capacity { 0 }, m_size { 0 };
   };
 
@@ -308,16 +309,14 @@ namespace daisy
       if ( !unicode_ranges_size )
         return 1;
 
-      // @todo; we're in c++ let's not use malloc... clogs up code
-      GLYPHSET *glyph_sets = ( GLYPHSET * ) malloc ( unicode_ranges_size );
-      if ( !glyph_sets )
+      auto glyph_sets_memory = std::make_unique< uint8_t[] > ( unicode_ranges_size );
+      if ( !glyph_sets_memory )
         return 1;
 
+      auto glyph_sets = reinterpret_cast< GLYPHSET * > ( glyph_sets_memory.get ( ) );
+
       if ( !GetFontUnicodeRanges ( context, glyph_sets ) )
-      {
-        free ( glyph_sets );
         return 1;
-      }
 
       this->m_spacing = static_cast< uint32_t > ( ceil ( size.cy * 0.3f ) );
 
@@ -342,18 +341,12 @@ namespace daisy
 
           // ran out of space in texture
           if ( y + size.cy > this->m_height )
-          {
-            free ( glyph_sets );
             return 2;
-          }
 
           if ( !measure )
           {
             if ( !ExtTextOutW ( context, x + 0, y + 0, ETO_OPAQUE, nullptr, &ch, 1, nullptr ) )
-            {
-              free ( glyph_sets );
               return 1;
-            }
 
             this->m_coords[ static_cast< uint16_t > ( ch ) ][ 0 ] = ( static_cast< float > ( x + 0 - this->m_spacing ) ) / this->m_width;
             this->m_coords[ static_cast< uint16_t > ( ch ) ][ 1 ] = ( static_cast< float > ( y + 0 + 0 ) ) / this->m_height;
@@ -364,8 +357,6 @@ namespace daisy
           x += size.cx + ( 2 * this->m_spacing );
         }
       }
-
-      free ( glyph_sets );
 
       return 0;
     }
@@ -606,6 +597,9 @@ namespace daisy
     /// <returns>true on success, false otherwise</returns>
     bool append ( const uint32_t uuid, const point_t &dimensions, uint8_t *tex_data, uint32_t tex_size ) noexcept
     {
+      if ( !tex_data || !tex_size )
+        return false;
+
       // go down if not enough space left
       if ( this->m_cursor.x + dimensions.x > this->m_dimensions.x )
       {
@@ -716,19 +710,18 @@ namespace daisy
           this->m_vtxs.m_capacity = this->m_vtxs.m_capacity * 2;
 
         // create new vertex buf
-        void *new_vtx = malloc ( this->m_vtxs.m_capacity * sizeof ( daisy_vtx_t ) );
+        auto new_vtx = std::make_unique< uint8_t[] > ( this->m_vtxs.m_capacity * sizeof ( daisy_vtx_t ) );
 
         if ( new_vtx )
         {
           // copy old data over
-          memcpy ( new_vtx, this->m_vtxs.m_data, this->m_vtxs.m_size * sizeof ( daisy_vtx_t ) );
+          memcpy ( new_vtx.get ( ), this->m_vtxs.m_data.get ( ), this->m_vtxs.m_size * sizeof ( daisy_vtx_t ) );
 
           // d3d9 buf needs to be reallocated on new flush (we could do this here, however this ensures we're in the d3d9 rendering thread)
           this->m_realloc_vtx = true;
 
-          // free old data
-          free ( this->m_vtxs.m_data );
-          this->m_vtxs.m_data = new_vtx;
+          // replace old data
+          this->m_vtxs.m_data.swap ( new_vtx );
         }
       }
 
@@ -740,19 +733,18 @@ namespace daisy
           this->m_idxs.m_capacity = this->m_idxs.m_capacity * 2;
 
         // create new vertex buf
-        void *new_idx = malloc ( this->m_idxs.m_capacity * sizeof ( uint16_t ) );
+        auto new_idx = std::make_unique< uint8_t[] > ( this->m_idxs.m_capacity * sizeof ( uint16_t ) );
 
         if ( new_idx )
         {
           // copy old data over
-          memcpy ( new_idx, this->m_idxs.m_data, this->m_idxs.m_size * sizeof ( uint16_t ) );
+          memcpy ( new_idx.get(), this->m_idxs.m_data.get(), this->m_idxs.m_size * sizeof ( uint16_t ) );
 
           // d3d9 buf needs to be reallocated on new flush (we could do this here, however this ensures we're in the d3d9 rendering thread)
           this->m_realloc_idx = true;
 
-          // free old data
-          free ( this->m_idxs.m_data );
-          this->m_idxs.m_data = new_idx;
+          // replace old data
+          this->m_idxs.m_data.swap ( new_idx );
         }
       }
     }
@@ -847,16 +839,16 @@ namespace daisy
           return false;
 
       // create local buffers
-      if ( !this->m_vtxs.m_data )
+      if ( !this->m_vtxs.m_data.get ( ) )
       {
-        this->m_vtxs.m_data = malloc ( sizeof ( daisy_vtx_t ) * max_verts );
+        this->m_vtxs.m_data = std::make_unique< uint8_t[] > ( sizeof ( daisy_vtx_t ) * max_verts );
         this->m_vtxs.m_capacity = max_verts;
         this->m_vtxs.m_size = 0;
       }
 
       if ( !this->m_idxs.m_data )
       {
-        this->m_idxs.m_data = malloc ( sizeof ( uint16_t ) * max_indices );
+        this->m_idxs.m_data = std::make_unique< uint8_t[] > ( sizeof ( uint16_t ) * max_indices );
         this->m_idxs.m_capacity = max_indices;
         this->m_idxs.m_size = 0;
       }
@@ -949,8 +941,8 @@ namespace daisy
       }
 
       // we can just memcpy these
-      memcpy ( vert, this->m_vtxs.m_data, sizeof ( daisy_vtx_t ) * this->m_vtxs.m_size );
-      memcpy ( indx, this->m_idxs.m_data, sizeof ( uint16_t ) * this->m_idxs.m_size );
+      memcpy ( vert, this->m_vtxs.m_data.get ( ), sizeof ( daisy_vtx_t ) * this->m_vtxs.m_size );
+      memcpy ( indx, this->m_idxs.m_data.get ( ), sizeof ( uint16_t ) * this->m_idxs.m_size );
 
       // unlock and ret
       this->m_vertex_buffer->Unlock ( );
@@ -1054,8 +1046,8 @@ namespace daisy
                           static_cast< uint16_t > ( additional_indices + 2 ),
                           static_cast< uint16_t > ( additional_indices + 1 ) };
 
-      memcpy ( reinterpret_cast< void * > ( reinterpret_cast< uintptr_t > ( this->m_vtxs.m_data ) + ( sizeof ( daisy_vtx_t ) * this->m_vtxs.m_size ) ), &vtx, sizeof ( daisy_vtx_t ) * 4 );
-      memcpy ( reinterpret_cast< void * > ( reinterpret_cast< uintptr_t > ( this->m_idxs.m_data ) + ( sizeof ( uint16_t ) * this->m_idxs.m_size ) ), &idxs, sizeof ( uint16_t ) * 6 );
+      memcpy ( reinterpret_cast< void * > ( reinterpret_cast< uintptr_t > ( this->m_vtxs.m_data.get ( ) ) + ( sizeof ( daisy_vtx_t ) * this->m_vtxs.m_size ) ), &vtx, sizeof ( daisy_vtx_t ) * 4 );
+      memcpy ( reinterpret_cast< void * > ( reinterpret_cast< uintptr_t > ( this->m_idxs.m_data.get ( ) ) + ( sizeof ( uint16_t ) * this->m_idxs.m_size ) ), &idxs, sizeof ( uint16_t ) * 6 );
 
       this->m_vtxs.m_size += 4;
       this->m_idxs.m_size += 6;
@@ -1104,8 +1096,8 @@ namespace daisy
                           static_cast< uint16_t > ( additional_indices + 1 ),
                           static_cast< uint16_t > ( additional_indices + 2 ) };
 
-      memcpy ( reinterpret_cast< void * > ( reinterpret_cast< uintptr_t > ( this->m_vtxs.m_data ) + ( sizeof ( daisy_vtx_t ) * this->m_vtxs.m_size ) ), &vtx, sizeof ( daisy_vtx_t ) * 3 );
-      memcpy ( reinterpret_cast< void * > ( reinterpret_cast< uintptr_t > ( this->m_idxs.m_data ) + ( sizeof ( uint16_t ) * this->m_idxs.m_size ) ), &idxs, sizeof ( uint16_t ) * 3 );
+      memcpy ( reinterpret_cast< void * > ( reinterpret_cast< uintptr_t > ( this->m_vtxs.m_data.get ( ) ) + ( sizeof ( daisy_vtx_t ) * this->m_vtxs.m_size ) ), &vtx, sizeof ( daisy_vtx_t ) * 3 );
+      memcpy ( reinterpret_cast< void * > ( reinterpret_cast< uintptr_t > ( this->m_idxs.m_data.get ( ) ) + ( sizeof ( uint16_t ) * this->m_idxs.m_size ) ), &idxs, sizeof ( uint16_t ) * 3 );
 
       this->m_vtxs.m_size += 3;
       this->m_idxs.m_size += 3;
@@ -1145,8 +1137,8 @@ namespace daisy
                           static_cast< uint16_t > ( additional_indices + 3 ),
                           static_cast< uint16_t > ( additional_indices + 1 ) };
 
-      memcpy ( reinterpret_cast< void * > ( reinterpret_cast< uintptr_t > ( this->m_vtxs.m_data ) + ( sizeof ( daisy_vtx_t ) * this->m_vtxs.m_size ) ), &vtx, sizeof ( daisy_vtx_t ) * 4 );
-      memcpy ( reinterpret_cast< void * > ( reinterpret_cast< uintptr_t > ( this->m_idxs.m_data ) + ( sizeof ( uint16_t ) * this->m_idxs.m_size ) ), &idxs, sizeof ( uint16_t ) * 6 );
+      memcpy ( reinterpret_cast< void * > ( reinterpret_cast< uintptr_t > ( this->m_vtxs.m_data.get ( ) ) + ( sizeof ( daisy_vtx_t ) * this->m_vtxs.m_size ) ), &vtx, sizeof ( daisy_vtx_t ) * 4 );
+      memcpy ( reinterpret_cast< void * > ( reinterpret_cast< uintptr_t > ( this->m_idxs.m_data.get ( ) ) + ( sizeof ( uint16_t ) * this->m_idxs.m_size ) ), &idxs, sizeof ( uint16_t ) * 6 );
 
       this->m_vtxs.m_size += 4;
       this->m_idxs.m_size += 6;
@@ -1256,8 +1248,8 @@ namespace daisy
               static_cast< uint16_t > ( additional_indices + cont_vertices + 1 ),
           };
 
-          memcpy ( reinterpret_cast< void * > ( reinterpret_cast< uintptr_t > ( this->m_vtxs.m_data ) + ( sizeof ( daisy_vtx_t ) * this->m_vtxs.m_size ) ), &v, sizeof ( daisy_vtx_t ) * 4 );
-          memcpy ( reinterpret_cast< void * > ( reinterpret_cast< uintptr_t > ( this->m_idxs.m_data ) + ( sizeof ( uint16_t ) * this->m_idxs.m_size ) ), &idxs, sizeof ( uint16_t ) * 6 );
+          memcpy ( reinterpret_cast< void * > ( reinterpret_cast< uintptr_t > ( this->m_vtxs.m_data.get ( ) ) + ( sizeof ( daisy_vtx_t ) * this->m_vtxs.m_size ) ), &v, sizeof ( daisy_vtx_t ) * 4 );
+          memcpy ( reinterpret_cast< void * > ( reinterpret_cast< uintptr_t > ( this->m_idxs.m_data.get ( ) ) + ( sizeof ( uint16_t ) * this->m_idxs.m_size ) ), &idxs, sizeof ( uint16_t ) * 6 );
 
           this->m_vtxs.m_size += 4;
           this->m_idxs.m_size += 6;
