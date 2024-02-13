@@ -6,12 +6,12 @@
 
 // stl includes
 #include <unordered_map> // std::unordered_map
-#include <string_view> // std::string_view
-#include <vector> // std::vector
-#include <array> // std::array
-#include <atomic> // std::atomic
-#include <cstdint> // uint/int types
- 
+#include <string_view>   // std::string_view
+#include <vector>        // std::vector
+#include <array>         // std::array
+#include <atomic>        // std::atomic
+#include <cstdint>       // uint/int types
+
 // d3d9
 #include <d3d9.h>
 
@@ -814,8 +814,8 @@ namespace daisy
 
       // need to update gpu-side buffers
       this->m_update = true;
-
     }
+
   public:
     c_renderqueue ( ) noexcept
         : m_vertex_buffer ( nullptr ), m_index_buffer ( nullptr ), m_update ( true ), m_realloc_vtx ( false ), m_realloc_idx ( false )
@@ -832,7 +832,7 @@ namespace daisy
     /// <param name="max_verts">max capacity of vertex buffer</param>
     /// <param name="max_indices">max capacity of index buffer</param>
     /// <returns>true on success, false otherwise</returns>
-    [[nodiscard]] bool create ( const uint32_t max_verts = 32767, const uint32_t max_indices = 65535 ) noexcept 
+    [[nodiscard]] bool create ( const uint32_t max_verts = 32767, const uint32_t max_indices = 65535 ) noexcept
     {
       if ( !daisy_t::s_device )
         return false;
@@ -1038,7 +1038,7 @@ namespace daisy
     /// <param name="uv_maxs">uv maxs of rectangle in texture (by default {1, 1})</param>
     void push_gradient_rectangle ( const point_t &position, const point_t &size, const color_t c1, const color_t c2, const color_t c3, const color_t c4, IDirect3DTexture9 *texture_handle = nullptr, const point_t &uv_mins = { 0.f, 0.f }, const point_t &uv_maxs = { 1.f, 1.f } ) noexcept
     {
-      this->ensure_buffers_capacity ( 4 , 6 );
+      this->ensure_buffers_capacity ( 4, 6 );
 
       uint32_t additional_indices = this->begin_batch ( texture_handle );
 
@@ -1127,7 +1127,7 @@ namespace daisy
       uint32_t additional_indices = this->begin_batch ( nullptr );
 
       // shoutout 8th grade math
-      point_t delta = { p2.x - p1.x , p2.y - p1.y };
+      point_t delta = { p2.x - p1.x, p2.y - p1.y };
       float length = sqrtf ( delta.x * delta.x + delta.y * delta.y ) + FLT_EPSILON;
 
       float scale = width / ( 2.f * length );
@@ -1163,7 +1163,7 @@ namespace daisy
     /// <param name="text">text to draw</param>
     /// <param name="color">color of text to draw</param>
     /// <param name="alignment">alignment of text to draw</param>
-    template<typename t = std::string_view>
+    template < typename t = std::string_view >
     void push_text ( c_fontwrapper &font, const point_t &position, const t text, const color_t &color, uint16_t alignment = TEXT_ALIGN_DEFAULT ) noexcept
     {
       // this is a rough approximate, best we can do without passing thru the entire text twice.
@@ -1236,7 +1236,7 @@ namespace daisy
         float tx2 = coords[ 2 ];
         float ty2 = coords[ 3 ];
 
-        float w = ( tx2 - tx1 ) * font.width() / font.scale();
+        float w = ( tx2 - tx1 ) * font.width ( ) / font.scale ( );
         float h = ( ty2 - ty1 ) * font.height ( ) / font.scale ( );
 
         if ( !is_space )
@@ -1307,7 +1307,7 @@ namespace daisy
     {
       return this->m_front_queue.reset ( pre_reset ) && this->m_back_queue.reset ( pre_reset );
     }
-    
+
     /// <summary>
     /// swap back and front drawlists
     /// </summary>
@@ -1338,7 +1338,7 @@ namespace daisy
   /// initializes daisy
   /// </summary>
   /// <param name="device">d3d9 device handle</param>
-  inline static void daisy_initialize ( IDirect3DDevice9* device ) noexcept
+  inline static void daisy_initialize ( IDirect3DDevice9 *device ) noexcept
   {
     daisy_t::s_device = device;
     daisy_t::s_device->AddRef ( );
