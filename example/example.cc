@@ -1,5 +1,5 @@
 ﻿// warning! no d3d9/winapi error handling in this **EXAMPLE**! this is meant to be a quick & dirty way to test stuff, with no guarantees.
-// also of note; device resets aren't handled in the example yet. i'll get to it eventually, but it's not a priority right now. 
+// also of note; device resets aren't handled in the example yet. i'll get to it eventually, but it's not a priority right now.
 // if you want to learn about device reset handling with daisy, read the usage walkthrough in the README.md
 
 // shut msvc up
@@ -123,13 +123,13 @@ INT WINAPI WinMain (
   if ( !atlas.create ( { 2048.f, 2048.f } ) )
     return EXIT_FAILURE;
 
-  // append an image to atlas 
+  // append an image to atlas
   {
     int w, h;
     auto daisy_tex = create_texture_from_image ( "daisy.jpg", w, h );
     if ( !daisy_tex.empty ( ) )
     {
-      atlas.append ( 1, { static_cast< float > ( w ), static_cast< float > ( h ) }, daisy_tex.data ( ), daisy_tex.size ( ) );
+      atlas.append ( 1, { static_cast< float > ( w ), static_cast< float > ( h ) }, daisy_tex.data ( ), static_cast< uint32_t > ( daisy_tex.size ( ) ) );
     }
   }
 

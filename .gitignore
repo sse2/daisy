@@ -5,3 +5,5 @@ int
 *.vcxproj
 *.vcxproj.filters
 *.vcxproj.user
+CMakeLists.txt
+build
