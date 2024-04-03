@@ -1073,20 +1073,22 @@ namespace daisy
 
       uint32_t additional_indices = this->begin_batch ( texture_handle );
 
-      daisy_vtx_t vtx[] = { daisy_vtx_t { { floorf ( position.x ), floorf ( position.y ), 0.0f, 1.f }, c1.bgra, { uv_mins.x, uv_mins.y } },                   // top-left
-                            daisy_vtx_t { { floorf ( position.x + size.x ), floorf ( position.y ), 0.0f, 1.f }, c2.bgra, { uv_maxs.x, uv_mins.y } },          // top-right
-                            daisy_vtx_t { { floorf ( position.x + size.x ), floorf ( position.y + size.y ), 0.0f, 1.f }, c4.bgra, { uv_maxs.x, uv_maxs.y } }, // bottom-right
-                            daisy_vtx_t { { floorf ( position.x ), floorf ( position.y + size.y ), 0.0f, 1.f }, c3.bgra, { uv_mins.x, uv_maxs.y } } };        // bottom-left
+      auto vtx_counter = 0, idx_counter = 0;
 
-      uint16_t idxs[] = { static_cast< uint16_t > ( additional_indices ),
-                          static_cast< uint16_t > ( additional_indices + 1 ),
-                          static_cast< uint16_t > ( additional_indices + 3 ),
-                          static_cast< uint16_t > ( additional_indices + 3 ),
-                          static_cast< uint16_t > ( additional_indices + 2 ),
-                          static_cast< uint16_t > ( additional_indices + 1 ) };
+      daisy_vtx_t *vtx = reinterpret_cast< daisy_vtx_t * > ( reinterpret_cast< uintptr_t > ( this->m_vtxs.m_data.get ( ) ) + ( sizeof ( daisy_vtx_t ) * this->m_vtxs.m_size ) );
+      uint16_t *idx = reinterpret_cast< uint16_t * > ( reinterpret_cast< uintptr_t > ( this->m_idxs.m_data.get ( ) ) + ( sizeof ( uint16_t ) * this->m_idxs.m_size ) );
 
-      memcpy ( reinterpret_cast< void * > ( reinterpret_cast< uintptr_t > ( this->m_vtxs.m_data.get ( ) ) + ( sizeof ( daisy_vtx_t ) * this->m_vtxs.m_size ) ), &vtx, sizeof ( daisy_vtx_t ) * 4 );
-      memcpy ( reinterpret_cast< void * > ( reinterpret_cast< uintptr_t > ( this->m_idxs.m_data.get ( ) ) + ( sizeof ( uint16_t ) * this->m_idxs.m_size ) ), &idxs, sizeof ( uint16_t ) * 6 );
+      vtx[ vtx_counter++ ] = daisy_vtx_t { { floorf ( position.x ), floorf ( position.y ), 0.0f, 1.f }, c1.bgra, { uv_mins.x, uv_mins.y } };
+      vtx[ vtx_counter++ ] = daisy_vtx_t { { floorf ( position.x + size.x ), floorf ( position.y ), 0.0f, 1.f }, c2.bgra, { uv_maxs.x, uv_mins.y } };
+      vtx[ vtx_counter++ ] = daisy_vtx_t { { floorf ( position.x + size.x ), floorf ( position.y + size.y ), 0.0f, 1.f }, c4.bgra, { uv_maxs.x, uv_maxs.y } };
+      vtx[ vtx_counter++ ] = daisy_vtx_t { { floorf ( position.x ), floorf ( position.y + size.y ), 0.0f, 1.f }, c3.bgra, { uv_mins.x, uv_maxs.y } };
+
+      idx[ idx_counter++ ] = static_cast< uint16_t > ( additional_indices );
+      idx[ idx_counter++ ] = static_cast< uint16_t > ( additional_indices + 1 );
+      idx[ idx_counter++ ] = static_cast< uint16_t > ( additional_indices + 3 );
+      idx[ idx_counter++ ] = static_cast< uint16_t > ( additional_indices + 3 );
+      idx[ idx_counter++ ] = static_cast< uint16_t > ( additional_indices + 2 );
+      idx[ idx_counter++ ] = static_cast< uint16_t > ( additional_indices + 1 );
 
       this->m_vtxs.m_size += 4;
       this->m_idxs.m_size += 6;
@@ -1127,16 +1129,18 @@ namespace daisy
 
       uint32_t additional_indices = this->begin_batch ( texture_handle );
 
-      daisy_vtx_t vtx[] = { daisy_vtx_t { { floorf ( p1.x ), floorf ( p1.y ), 0.0f, 1.f }, c1.bgra, { uv1.x, uv1.y } },
-                            daisy_vtx_t { { floorf ( p2.x ), floorf ( p2.y ), 0.0f, 1.f }, c2.bgra, { uv2.x, uv2.y } },
-                            daisy_vtx_t { { floorf ( p3.x ), floorf ( p3.y ), 0.0f, 1.f }, c3.bgra, { uv3.x, uv3.y } } };
+      auto vtx_counter = 0, idx_counter = 0;
 
-      uint16_t idxs[] = { static_cast< uint16_t > ( additional_indices ),
-                          static_cast< uint16_t > ( additional_indices + 1 ),
-                          static_cast< uint16_t > ( additional_indices + 2 ) };
+      daisy_vtx_t *vtx = reinterpret_cast< daisy_vtx_t * > ( reinterpret_cast< uintptr_t > ( this->m_vtxs.m_data.get ( ) ) + ( sizeof ( daisy_vtx_t ) * this->m_vtxs.m_size ) );
+      uint16_t *idx = reinterpret_cast< uint16_t * > ( reinterpret_cast< uintptr_t > ( this->m_idxs.m_data.get ( ) ) + ( sizeof ( uint16_t ) * this->m_idxs.m_size ) );
 
-      memcpy ( reinterpret_cast< void * > ( reinterpret_cast< uintptr_t > ( this->m_vtxs.m_data.get ( ) ) + ( sizeof ( daisy_vtx_t ) * this->m_vtxs.m_size ) ), &vtx, sizeof ( daisy_vtx_t ) * 3 );
-      memcpy ( reinterpret_cast< void * > ( reinterpret_cast< uintptr_t > ( this->m_idxs.m_data.get ( ) ) + ( sizeof ( uint16_t ) * this->m_idxs.m_size ) ), &idxs, sizeof ( uint16_t ) * 3 );
+      vtx[ vtx_counter++ ] = daisy_vtx_t { { floorf ( p1.x ), floorf ( p1.y ), 0.0f, 1.f }, c1.bgra, { uv1.x, uv1.y } };
+      vtx[ vtx_counter++ ] = daisy_vtx_t { { floorf ( p2.x ), floorf ( p2.y ), 0.0f, 1.f }, c2.bgra, { uv2.x, uv2.y } };
+      vtx[ vtx_counter++ ] = daisy_vtx_t { { floorf ( p3.x ), floorf ( p3.y ), 0.0f, 1.f }, c3.bgra, { uv3.x, uv3.y } };
+
+      idx[ idx_counter++ ] = static_cast< uint16_t > ( additional_indices );
+      idx[ idx_counter++ ] = static_cast< uint16_t > ( additional_indices + 1 );
+      idx[ idx_counter++ ] = static_cast< uint16_t > ( additional_indices + 2 );
 
       this->m_vtxs.m_size += 3;
       this->m_idxs.m_size += 3;
@@ -1164,20 +1168,22 @@ namespace daisy
       float scale = width / ( 2.f * length );
       point_t radius = { -scale * delta.y, scale * delta.x };
 
-      daisy_vtx_t vtx[] = { daisy_vtx_t { { p1.x - radius.x, p1.y - radius.y, 0.0f, 1.f }, col.bgra, { 0.f, 0.f } },
-                            daisy_vtx_t { { p1.x + radius.x, p1.y + radius.y, 0.0f, 1.f }, col.bgra, { 1.f, 0.f } },
-                            daisy_vtx_t { { p2.x - radius.x, p2.y - radius.y, 0.0f, 1.f }, col.bgra, { 1.f, 1.f } },
-                            daisy_vtx_t { { p2.x + radius.x, p2.y + radius.y, 0.0f, 1.f }, col.bgra, { 0.f, 1.f } } };
+      auto vtx_counter = 0, idx_counter = 0;
 
-      uint16_t idxs[] = { static_cast< uint16_t > ( additional_indices ),
-                          static_cast< uint16_t > ( additional_indices + 1 ),
-                          static_cast< uint16_t > ( additional_indices + 2 ),
-                          static_cast< uint16_t > ( additional_indices + 2 ),
-                          static_cast< uint16_t > ( additional_indices + 3 ),
-                          static_cast< uint16_t > ( additional_indices + 1 ) };
+      daisy_vtx_t *vtx = reinterpret_cast< daisy_vtx_t * > ( reinterpret_cast< uintptr_t > ( this->m_vtxs.m_data.get ( ) ) + ( sizeof ( daisy_vtx_t ) * this->m_vtxs.m_size ) );
+      uint16_t *idx = reinterpret_cast< uint16_t * > ( reinterpret_cast< uintptr_t > ( this->m_idxs.m_data.get ( ) ) + ( sizeof ( uint16_t ) * this->m_idxs.m_size ) );
 
-      memcpy ( reinterpret_cast< void * > ( reinterpret_cast< uintptr_t > ( this->m_vtxs.m_data.get ( ) ) + ( sizeof ( daisy_vtx_t ) * this->m_vtxs.m_size ) ), &vtx, sizeof ( daisy_vtx_t ) * 4 );
-      memcpy ( reinterpret_cast< void * > ( reinterpret_cast< uintptr_t > ( this->m_idxs.m_data.get ( ) ) + ( sizeof ( uint16_t ) * this->m_idxs.m_size ) ), &idxs, sizeof ( uint16_t ) * 6 );
+      vtx[ vtx_counter++ ] = daisy_vtx_t { { p1.x - radius.x, p1.y - radius.y, 0.0f, 1.f }, col.bgra, { 0.f, 0.f } };
+      vtx[ vtx_counter++ ] = daisy_vtx_t { { p1.x + radius.x, p1.y + radius.y, 0.0f, 1.f }, col.bgra, { 1.f, 0.f } };
+      vtx[ vtx_counter++ ] = daisy_vtx_t { { p2.x - radius.x, p2.y - radius.y, 0.0f, 1.f }, col.bgra, { 1.f, 1.f } };
+      vtx[ vtx_counter++ ] = daisy_vtx_t { { p2.x + radius.x, p2.y + radius.y, 0.0f, 1.f }, col.bgra, { 0.f, 1.f } };
+
+      idx[ idx_counter++ ] = static_cast< uint16_t > ( additional_indices );
+      idx[ idx_counter++ ] = static_cast< uint16_t > ( additional_indices + 1 );
+      idx[ idx_counter++ ] = static_cast< uint16_t > ( additional_indices + 2 );
+      idx[ idx_counter++ ] = static_cast< uint16_t > ( additional_indices + 2 );
+      idx[ idx_counter++ ] = static_cast< uint16_t > ( additional_indices + 3 );
+      idx[ idx_counter++ ] = static_cast< uint16_t > ( additional_indices + 1 );
 
       this->m_vtxs.m_size += 4;
       this->m_idxs.m_size += 6;
@@ -1232,8 +1238,8 @@ namespace daisy
 
           if ( last_iteration )
           {
-            idx[ idx_counter++ ] = static_cast< uint16_t > ( additional_indices + i );     // last point
-            idx[ idx_counter++ ] = static_cast< uint16_t > ( additional_indices + 1 );     // center point
+            idx[ idx_counter++ ] = static_cast< uint16_t > ( additional_indices + i ); // last point
+            idx[ idx_counter++ ] = static_cast< uint16_t > ( additional_indices + 1 ); // center point
           }
           else
           {
@@ -1289,6 +1295,11 @@ namespace daisy
       float start_x = corrected_position.x;
       auto space_coords = font.coords ( 'A' );
 
+      auto vtx_counter = 0, idx_counter = 0;
+
+      daisy_vtx_t *vtx = reinterpret_cast< daisy_vtx_t * > ( reinterpret_cast< uintptr_t > ( this->m_vtxs.m_data.get ( ) ) + ( sizeof ( daisy_vtx_t ) * this->m_vtxs.m_size ) );
+      uint16_t *idx = reinterpret_cast< uint16_t * > ( reinterpret_cast< uintptr_t > ( this->m_idxs.m_data.get ( ) ) + ( sizeof ( uint16_t ) * this->m_idxs.m_size ) );
+
       for ( const auto c : text )
       {
         if ( c == '\n' )
@@ -1321,17 +1332,17 @@ namespace daisy
               { { corrected_position.x - 0.5f + w, corrected_position.y - 0.5f + h, 0.f, 1.f }, color.bgra, { tx2, ty2 } },
               { { corrected_position.x - 0.5f + w, corrected_position.y - 0.5f, 0.f, 1.f }, color.bgra, { tx2, ty1 } } };
 
-          uint16_t idxs[] = {
-              static_cast< uint16_t > ( additional_indices + cont_vertices ),
-              static_cast< uint16_t > ( additional_indices + cont_vertices + 1 ),
-              static_cast< uint16_t > ( additional_indices + cont_vertices + 2 ),
-              static_cast< uint16_t > ( additional_indices + cont_vertices + 3 ),
-              static_cast< uint16_t > ( additional_indices + cont_vertices + 2 ),
-              static_cast< uint16_t > ( additional_indices + cont_vertices + 1 ),
-          };
+          vtx[ vtx_counter++ ] = daisy_vtx_t { { corrected_position.x - 0.5f, corrected_position.y - 0.5f + h, 0.f, 1.f }, color.bgra, { tx1, ty2 } };
+          vtx[ vtx_counter++ ] = daisy_vtx_t { { corrected_position.x - 0.5f, corrected_position.y - 0.5f, 0.f, 1.f }, color.bgra, { tx1, ty1 } };
+          vtx[ vtx_counter++ ] = daisy_vtx_t { { corrected_position.x - 0.5f + w, corrected_position.y - 0.5f + h, 0.f, 1.f }, color.bgra, { tx2, ty2 } };
+          vtx[ vtx_counter++ ] = daisy_vtx_t { { corrected_position.x - 0.5f + w, corrected_position.y - 0.5f, 0.f, 1.f }, color.bgra, { tx2, ty1 } };
 
-          memcpy ( reinterpret_cast< void * > ( reinterpret_cast< uintptr_t > ( this->m_vtxs.m_data.get ( ) ) + ( sizeof ( daisy_vtx_t ) * this->m_vtxs.m_size ) ), &v, sizeof ( daisy_vtx_t ) * 4 );
-          memcpy ( reinterpret_cast< void * > ( reinterpret_cast< uintptr_t > ( this->m_idxs.m_data.get ( ) ) + ( sizeof ( uint16_t ) * this->m_idxs.m_size ) ), &idxs, sizeof ( uint16_t ) * 6 );
+          idx[ idx_counter++ ] = static_cast< uint16_t > ( additional_indices + cont_vertices );
+          idx[ idx_counter++ ] = static_cast< uint16_t > ( additional_indices + cont_vertices + 1 );
+          idx[ idx_counter++ ] = static_cast< uint16_t > ( additional_indices + cont_vertices + 2 );
+          idx[ idx_counter++ ] = static_cast< uint16_t > ( additional_indices + cont_vertices + 3 );
+          idx[ idx_counter++ ] = static_cast< uint16_t > ( additional_indices + cont_vertices + 2 );
+          idx[ idx_counter++ ] = static_cast< uint16_t > ( additional_indices + cont_vertices + 1 );
 
           this->m_vtxs.m_size += 4;
           this->m_idxs.m_size += 6;

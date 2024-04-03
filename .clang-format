@@ -26,5 +26,3 @@ SpacesInSquareBrackets: 'true'
 TabWidth: '4'
 ColumnLimit: '0'
 UseTab: Never
-
-...
