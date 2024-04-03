@@ -4,6 +4,9 @@
 #ifndef _SSE2_DAISY_INCLUDE_GUARD
 #define _SSE2_DAISY_INCLUDE_GUARD
 
+// you can replace this with your own includes if you don't want to use the standard library,
+// however you'll need to provide your own implementations for the stl containers and they need to be at least mostly compatible with the ones provided by the standard library
+#ifndef DAISY_NO_STL
 // stl includes
 #include <unordered_map> // std::unordered_map
 #include <string_view>   // std::string_view
@@ -11,7 +14,9 @@
 #include <array>         // std::array
 #include <atomic>        // std::atomic
 #include <memory>        // std::unique_ptr, std::make_unique
-#include <cstdint>       // uint/int types
+#include <cstdint>       // uint/int types, fabsf, fmodf
+namespace stl = std;
+#endif // DAISY_NO_STL
 
 // d3d9
 #include <d3d9.h>
@@ -97,7 +102,7 @@ namespace daisy
   // buffer
   struct renderbuffer_t
   {
-    std::unique_ptr< uint8_t[] > m_data { nullptr };
+    stl::unique_ptr< uint8_t[] > m_data { nullptr };
     uint32_t m_capacity { 0 }, m_size { 0 };
   };
 
@@ -130,7 +135,7 @@ namespace daisy
     FONT_ITALIC = 1 << 1
   };
 
-  using uv_t = std::array< float, 4 >;
+  using uv_t = stl::array< float, 4 >;
 
   struct point_t
   {
@@ -186,8 +191,8 @@ namespace daisy
   {
   private:
     // members
-    std::unordered_map< wchar_t, uv_t > m_coords;
-    std::string_view m_family;
+    stl::unordered_map< wchar_t, uv_t > m_coords;
+    stl::string_view m_family;
     IDirect3DTexture9 *m_texture_handle;
     float m_scale;
     uint32_t m_width, m_height, m_spacing, m_size, m_quality;
@@ -359,7 +364,7 @@ namespace daisy
       if ( !unicode_ranges_size )
         return 1;
 
-      auto glyph_sets_memory = std::make_unique< uint8_t[] > ( unicode_ranges_size );
+      auto glyph_sets_memory = stl::make_unique< uint8_t[] > ( unicode_ranges_size );
       if ( !glyph_sets_memory )
         return 1;
 
@@ -430,7 +435,7 @@ namespace daisy
     /// <param name="quality">font quality (NONANTIALIASED_QUALITY, CLEARTYPE_NATURAL_QUALITY etc.)</param>
     /// <param name="flags">font flags (see enum daisy_font_flags; FONT_DEFAULT, FONT_BOLD, FONT_ITALIC)</param>
     /// <returns>true on succesful font creation, false otherwise</returns>
-    [[nodiscard]] bool create ( const std::string_view family, uint32_t height, uint32_t quality, uint8_t flags ) noexcept
+    [[nodiscard]] bool create ( const stl::string_view family, uint32_t height, uint32_t quality, uint8_t flags ) noexcept
     {
       this->m_family = family;
       this->m_size = height;
@@ -448,7 +453,7 @@ namespace daisy
     /// <typeparam name="t">iteratable text container (only char and wchar_t accepted currently)</typeparam>
     /// <param name="text">text to measure</param>
     /// <returns>point_t containing width and height of measured text</returns>
-    template < typename t = std::string_view >
+    template < typename t = stl::string_view >
     point_t text_extent ( t text ) noexcept
     {
       float row_width = 0.f;
@@ -576,7 +581,7 @@ namespace daisy
   class c_texatlas : public c_daisy_resettable_object
   {
   private:
-    std::unordered_map< uint32_t, uv_t > m_coords;
+    stl::unordered_map< uint32_t, uv_t > m_coords;
     point_t m_cursor, m_dimensions;
     IDirect3DTexture9 *m_texture_handle;
     float m_max_height;
@@ -725,7 +730,7 @@ namespace daisy
 
     renderbuffer_t m_vtxs, m_idxs;
 
-    std::vector< daisy_drawcall_t > m_drawcalls;
+    stl::vector< daisy_drawcall_t > m_drawcalls;
 
     // update d3d9 sided vtx/idx buffers
     bool m_update;
@@ -749,7 +754,7 @@ namespace daisy
           this->m_vtxs.m_capacity = this->m_vtxs.m_capacity * 2;
 
         // create new vertex buf
-        auto new_vtx = std::make_unique< uint8_t[] > ( this->m_vtxs.m_capacity * sizeof ( daisy_vtx_t ) );
+        auto new_vtx = stl::make_unique< uint8_t[] > ( this->m_vtxs.m_capacity * sizeof ( daisy_vtx_t ) );
 
         if ( new_vtx )
         {
@@ -772,7 +777,7 @@ namespace daisy
           this->m_idxs.m_capacity = this->m_idxs.m_capacity * 2;
 
         // create new vertex buf
-        auto new_idx = std::make_unique< uint8_t[] > ( this->m_idxs.m_capacity * sizeof ( uint16_t ) );
+        auto new_idx = stl::make_unique< uint8_t[] > ( this->m_idxs.m_capacity * sizeof ( uint16_t ) );
 
         if ( new_idx )
         {
@@ -831,7 +836,7 @@ namespace daisy
         d.m_tri.m_texture_handle = texture_handle;
         d.m_tri.m_primitives = primitives;
 
-        this->m_drawcalls.push_back ( std::move ( d ) );
+        this->m_drawcalls.push_back ( stl::move ( d ) );
       }
       // call is batched
       else
@@ -880,14 +885,14 @@ namespace daisy
       // create local buffers
       if ( !this->m_vtxs.m_data.get ( ) )
       {
-        this->m_vtxs.m_data = std::make_unique< uint8_t[] > ( sizeof ( daisy_vtx_t ) * max_verts );
+        this->m_vtxs.m_data = stl::make_unique< uint8_t[] > ( sizeof ( daisy_vtx_t ) * max_verts );
         this->m_vtxs.m_capacity = max_verts;
         this->m_vtxs.m_size = 0;
       }
 
       if ( !this->m_idxs.m_data )
       {
-        this->m_idxs.m_data = std::make_unique< uint8_t[] > ( sizeof ( uint16_t ) * max_indices );
+        this->m_idxs.m_data = stl::make_unique< uint8_t[] > ( sizeof ( uint16_t ) * max_indices );
         this->m_idxs.m_capacity = max_indices;
         this->m_idxs.m_size = 0;
       }
@@ -1052,7 +1057,7 @@ namespace daisy
       d.m_scissor.m_position = position;
       d.m_scissor.m_size = size;
 
-      this->m_drawcalls.push_back ( std::move ( d ) );
+      this->m_drawcalls.push_back ( stl::move ( d ) );
     }
 
     /// <summary>
@@ -1264,7 +1269,7 @@ namespace daisy
     /// <param name="text">text to draw</param>
     /// <param name="color">color of text to draw</param>
     /// <param name="alignment">alignment of text to draw</param>
-    template < typename t = std::string_view >
+    template < typename t = stl::string_view >
     void push_text ( c_fontwrapper &font, const point_t &position, const t text, const color_t &color, uint16_t alignment = TEXT_ALIGN_DEFAULT ) noexcept
     {
       // this is a rough approximate, best we can do without passing thru the entire text twice.
@@ -1363,7 +1368,7 @@ namespace daisy
   {
   private:
     c_renderqueue m_front_queue, m_back_queue;
-    std::atomic< bool > m_swap_drawlists;
+    stl::atomic< bool > m_swap_drawlists;
 
   public:
     /// <summary>
