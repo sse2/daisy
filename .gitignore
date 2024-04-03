@@ -7,3 +7,4 @@ int
 *.vcxproj.user
 CMakeLists.txt
 build
+.vscode
