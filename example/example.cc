@@ -205,7 +205,7 @@ INT WINAPI WinMain (
     queue.push_filled_circle ( { 540, 260 }, 80.f, 90, { 255, 255, 255 }, daisy::color_t::from_hsv ( fmodf ( realtime * 30.f, 360.f ), 0.6f, 1.f ) );
 
     // lower radius, dynamic segment count
-    queue.push_filled_circle ( { 540, 660 }, 40.f, 3 + fmodf ( realtime * 0.1f, 1.f ) * 32, { 255, 255, 255 }, daisy::color_t::from_hsv ( fmodf ( realtime * 30.f, 360.f ), 0.6f, 1.f ) );
+    queue.push_filled_circle ( { 540, 660 }, 40.f, 3 + static_cast< int > ( fmodf ( realtime * 0.1f, 1.f ) * 32 ), { 255, 255, 255 }, daisy::color_t::from_hsv ( fmodf ( realtime * 30.f, 360.f ), 0.6f, 1.f ) );
 
     // push a filled growing circle arc
     queue.push_filled_arc ( { 160, 160 }, 75.f, 90, fmodf ( realtime * 0.3f, 1.f ), { 255, 255, 255 }, daisy::color_t::from_hsv ( fmodf ( realtime * 30.f, 360.f ), 0.6f, 1.f ) );
