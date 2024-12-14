@@ -1516,7 +1516,7 @@ namespace daisy
 #endif // _SSE2_DAISY_INCLUDE_GUARD
 
 /*
-Copyright (c) 2023 Munteanu Octavian-Adrian
+Copyright (c) 2024 Munteanu Octavian-Adrian
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
