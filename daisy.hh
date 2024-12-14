@@ -14,7 +14,7 @@
 #include <array>         // std::array
 #include <atomic>        // std::atomic
 #include <memory>        // std::unique_ptr, std::make_unique
-#include <cstdint>       // uint/int types, fabsf, fmodf
+#include <cstdint>       // uint/int types, fabsf, fmodf, sinf, cosf
 namespace stl = std;
 #endif // DAISY_NO_STL
 
@@ -23,6 +23,12 @@ namespace stl = std;
 
 namespace daisy
 {
+  namespace detail
+  {
+    constexpr static inline auto PI = 3.14159265358979323846f;
+    constexpr static inline auto PI_SQUARED = PI * PI;
+  } // namespace detail
+
   // our color struct
   struct color_t
   {
@@ -49,10 +55,11 @@ namespace daisy
     /// <returns></returns>
     static color_t from_hsv ( float hue, float saturation, float variance )
     {
+      // @ref: stackoverflow - can't find the original link, sorry!
       color_t ret;
 
       float C = saturation * variance;
-      float X = C * ( 1 - fabsf ( fmodf ( hue / 60.f, 2 ) - 1 ) );
+      float X = C * ( 1 - stl::fabsf ( stl::fmodf ( hue / 60.f, 2 ) - 1 ) );
       float m = variance - C;
 
       float r, g, b;
@@ -747,10 +754,10 @@ namespace daisy
     void ensure_buffers_capacity ( const uint32_t vertices_to_add, const uint32_t indices_to_add ) noexcept
     {
       // check vtxbuf
-      if ( this->m_vtxs.m_size + vertices_to_add > this->m_vtxs.m_capacity )
+      if ( this->m_vtxs.m_size + vertices_to_add >= this->m_vtxs.m_capacity )
       {
         // set new capacity
-        while ( this->m_vtxs.m_size + vertices_to_add > this->m_vtxs.m_capacity )
+        while ( this->m_vtxs.m_size + vertices_to_add >= this->m_vtxs.m_capacity )
           this->m_vtxs.m_capacity = this->m_vtxs.m_capacity * 2;
 
         // create new vertex buf
@@ -770,13 +777,13 @@ namespace daisy
       }
 
       // check idxbuf
-      if ( this->m_idxs.m_size + indices_to_add > this->m_idxs.m_capacity )
+      if ( this->m_idxs.m_size + indices_to_add >= this->m_idxs.m_capacity )
       {
         // set capacity
-        while ( this->m_idxs.m_size + indices_to_add > this->m_idxs.m_capacity )
+        while ( this->m_idxs.m_size + indices_to_add >= this->m_idxs.m_capacity )
           this->m_idxs.m_capacity = this->m_idxs.m_capacity * 2;
 
-        // create new vertex buf
+        // create new index buf
         auto new_idx = stl::make_unique< uint8_t[] > ( this->m_idxs.m_capacity * sizeof ( uint16_t ) );
 
         if ( new_idx )
@@ -1197,6 +1204,66 @@ namespace daisy
     }
 
     /// <summary>
+    /// push filled arc of circle to drawlist
+    /// to note: it would be more efficient to use a pixel shader and draw a quad to draw the circle
+    /// </summary>
+    /// <param name="center">center of circle</param>
+    /// <param name="radius">radius of circle</param>
+    /// <param name="segments">how many points are used to draw the circle (less = circle is less accurate, more = more vertices and indicies used, increased memory usage, slower to compute)</param>
+    /// <param name="factor">how much of the circle arc to draw [0.0, 1.0]</param>
+    /// <param name="center_color">the color of the center of the circle</param>
+    /// <param name="outer_color">the color of the outside of the circle</param>
+    void push_filled_arc ( const point_t &center, const float radius, const int segments, const float factor, const color_t &center_color, const color_t &outer_color )
+    {
+      // sanity checks
+      if ( segments < 3 || factor <= 0.f || factor > 1.f )
+        return;
+
+      int segments_to_draw = static_cast< int > ( static_cast< float > ( segments ) * factor );
+
+      this->ensure_buffers_capacity ( static_cast< uint32_t > ( segments_to_draw + 2 ), static_cast< uint32_t > ( ( segments_to_draw + 1 ) * 3 ) );
+
+      uint32_t additional_indices = this->begin_batch ( nullptr );
+
+      auto vtx_counter = 0, idx_counter = 0, primitive_counter = 0;
+
+      // write directly to the end of the buffer as we know we have more than enough space - need to start doing this everywhere
+      daisy_vtx_t *vtx = reinterpret_cast< daisy_vtx_t * > ( reinterpret_cast< uintptr_t > ( this->m_vtxs.m_data.get ( ) ) + ( sizeof ( daisy_vtx_t ) * this->m_vtxs.m_size ) );
+      uint16_t *idx = reinterpret_cast< uint16_t * > ( reinterpret_cast< uintptr_t > ( this->m_idxs.m_data.get ( ) ) + ( sizeof ( uint16_t ) * this->m_idxs.m_size ) );
+
+      // center point
+      vtx[ vtx_counter++ ] = daisy_vtx_t { { center.x, center.y, 0.0f, 1.f }, center_color.bgra, { 0.f, 0.f } };
+
+      auto seg = segments_to_draw;
+
+      // outer points
+      for ( int i = 0; i <= seg + 1; ++i )
+      {
+        float tetha = 2.f * detail::PI * static_cast< float > ( i ) / static_cast< float > ( segments );
+        float x = center.x + ( radius * stl::cosf ( tetha ) );
+        float y = center.y - ( radius * stl::sinf ( tetha ) );
+
+        // circle outer point
+        vtx[ vtx_counter++ ] = daisy_vtx_t { { x, y, 0.0f, 1.f }, outer_color.bgra, { 0.f, 0.f } };
+
+        // indices
+        if ( i > 0 )
+        {
+          idx[ idx_counter++ ] = static_cast< uint16_t > ( additional_indices );         // center
+          idx[ idx_counter++ ] = static_cast< uint16_t > ( additional_indices + i );     // current outer
+          idx[ idx_counter++ ] = static_cast< uint16_t > ( additional_indices + i - 1 ); // last outer
+
+          primitive_counter++;
+        }
+      }
+
+      this->m_vtxs.m_size += vtx_counter;
+      this->m_idxs.m_size += idx_counter;
+
+      this->end_batch ( additional_indices, vtx_counter, idx_counter, primitive_counter, nullptr );
+    }
+
+    /// <summary>
     /// push filled circle to drawlist
     /// to note: it would be more efficient to use a pixel shader and draw a quad to draw the circle
     /// </summary>
@@ -1207,57 +1274,7 @@ namespace daisy
     /// <param name="outer_color">the color of the outside of the circle</param>
     void push_filled_circle ( const point_t &center, const float radius, const int segments, const color_t &center_color, const color_t &outer_color )
     {
-      this->ensure_buffers_capacity ( static_cast< uint32_t > ( segments + 1 ), static_cast< uint32_t > ( segments * 3 ) );
-
-      constexpr static auto PI = 3.14159265358979323846f;
-      constexpr static auto PI2 = PI * PI;
-
-      uint32_t additional_indices = this->begin_batch ( nullptr );
-
-      auto vtx_counter = 0, idx_counter = 0;
-
-      // write directly to the end of the buffer as we know we have more than enough space - need to start doing this everywhere
-      daisy_vtx_t *vtx = reinterpret_cast< daisy_vtx_t * > ( reinterpret_cast< uintptr_t > ( this->m_vtxs.m_data.get ( ) ) + ( sizeof ( daisy_vtx_t ) * this->m_vtxs.m_size ) );
-      uint16_t *idx = reinterpret_cast< uint16_t * > ( reinterpret_cast< uintptr_t > ( this->m_idxs.m_data.get ( ) ) + ( sizeof ( uint16_t ) * this->m_idxs.m_size ) );
-
-      // center point
-      vtx[ vtx_counter++ ] = daisy_vtx_t { { center.x, center.y, 0.0f, 1.f }, center_color.bgra, { 0.f, 0.f } };
-
-      // outer points
-      for ( int i = 0; i <= segments; ++i )
-      {
-        float theta = ( 2.f * PI2 * i ) / segments;
-        float x = center.x + radius * cosf ( theta );
-        float y = center.y + radius * sinf ( theta );
-
-        auto last_iteration = ( i == segments );
-
-        // we save a vertex here
-        if ( !last_iteration )
-          vtx[ vtx_counter++ ] = daisy_vtx_t { { x, y, 0.0f, 1.f }, outer_color.bgra, { 0.f, 0.f } };
-
-        // don't do this for the first point as we have no previous point to connect to, we run an extra iteration to connect the last point to the first at the end
-        if ( i )
-        {
-          idx[ idx_counter++ ] = static_cast< uint16_t > ( additional_indices ); // center point
-
-          if ( last_iteration )
-          {
-            idx[ idx_counter++ ] = static_cast< uint16_t > ( additional_indices + i ); // last point
-            idx[ idx_counter++ ] = static_cast< uint16_t > ( additional_indices + 1 ); // center point
-          }
-          else
-          {
-            idx[ idx_counter++ ] = static_cast< uint16_t > ( additional_indices + i );     // last point
-            idx[ idx_counter++ ] = static_cast< uint16_t > ( additional_indices + i + 1 ); // this point
-          }
-        }
-      }
-
-      this->m_vtxs.m_size += vtx_counter;
-      this->m_idxs.m_size += idx_counter;
-
-      this->end_batch ( additional_indices, vtx_counter, idx_counter, segments, nullptr );
+      this->push_filled_arc ( center, radius, segments, 1.f, center_color, outer_color );
     }
 
     /// <summary>
@@ -1272,7 +1289,7 @@ namespace daisy
     template < typename t = stl::string_view >
     void push_text ( c_fontwrapper &font, const point_t &position, const t text, const color_t &color, uint16_t alignment = TEXT_ALIGN_DEFAULT ) noexcept
     {
-      // this is a rough approximate, best we can do without passing thru the entire text twice.
+      // this is a rough approximate, best we can do without passing through the entire string twice.
       this->ensure_buffers_capacity ( static_cast< uint32_t > ( text.size ( ) * 4 ), static_cast< uint32_t > ( text.size ( ) * 6 ) );
 
       uint32_t additional_indices = this->begin_batch ( font.texture_handle ( ) );
