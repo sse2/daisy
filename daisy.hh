@@ -14,7 +14,7 @@
 #include <array>         // std::array
 #include <atomic>        // std::atomic
 #include <memory>        // std::unique_ptr, std::make_unique
-#include <cstdint>       // uint/int types, fabsf, fmodf, sinf, cosf
+#include <cstdint>       // uint/int types, fabsf, fmodf, sinf, cosf, floorf
 namespace stl = std;
 #endif // DAISY_NO_STL
 
@@ -1090,10 +1090,10 @@ namespace daisy
       daisy_vtx_t *vtx = reinterpret_cast< daisy_vtx_t * > ( reinterpret_cast< uintptr_t > ( this->m_vtxs.m_data.get ( ) ) + ( sizeof ( daisy_vtx_t ) * this->m_vtxs.m_size ) );
       uint16_t *idx = reinterpret_cast< uint16_t * > ( reinterpret_cast< uintptr_t > ( this->m_idxs.m_data.get ( ) ) + ( sizeof ( uint16_t ) * this->m_idxs.m_size ) );
 
-      vtx[ vtx_counter++ ] = daisy_vtx_t { { floorf ( position.x ), floorf ( position.y ), 0.0f, 1.f }, c1.bgra, { uv_mins.x, uv_mins.y } };
-      vtx[ vtx_counter++ ] = daisy_vtx_t { { floorf ( position.x + size.x ), floorf ( position.y ), 0.0f, 1.f }, c2.bgra, { uv_maxs.x, uv_mins.y } };
-      vtx[ vtx_counter++ ] = daisy_vtx_t { { floorf ( position.x + size.x ), floorf ( position.y + size.y ), 0.0f, 1.f }, c4.bgra, { uv_maxs.x, uv_maxs.y } };
-      vtx[ vtx_counter++ ] = daisy_vtx_t { { floorf ( position.x ), floorf ( position.y + size.y ), 0.0f, 1.f }, c3.bgra, { uv_mins.x, uv_maxs.y } };
+      vtx[ vtx_counter++ ] = daisy_vtx_t { { stl::floorf ( position.x ), stl::floorf ( position.y ), 0.0f, 1.f }, c1.bgra, { uv_mins.x, uv_mins.y } };
+      vtx[ vtx_counter++ ] = daisy_vtx_t { { stl::floorf ( position.x + size.x ), stl::floorf ( position.y ), 0.0f, 1.f }, c2.bgra, { uv_maxs.x, uv_mins.y } };
+      vtx[ vtx_counter++ ] = daisy_vtx_t { { stl::floorf ( position.x + size.x ), stl::floorf ( position.y + size.y ), 0.0f, 1.f }, c4.bgra, { uv_maxs.x, uv_maxs.y } };
+      vtx[ vtx_counter++ ] = daisy_vtx_t { { stl::floorf ( position.x ), stl::floorf ( position.y + size.y ), 0.0f, 1.f }, c3.bgra, { uv_mins.x, uv_maxs.y } };
 
       idx[ idx_counter++ ] = static_cast< uint16_t > ( additional_indices );
       idx[ idx_counter++ ] = static_cast< uint16_t > ( additional_indices + 1 );
@@ -1146,9 +1146,9 @@ namespace daisy
       daisy_vtx_t *vtx = reinterpret_cast< daisy_vtx_t * > ( reinterpret_cast< uintptr_t > ( this->m_vtxs.m_data.get ( ) ) + ( sizeof ( daisy_vtx_t ) * this->m_vtxs.m_size ) );
       uint16_t *idx = reinterpret_cast< uint16_t * > ( reinterpret_cast< uintptr_t > ( this->m_idxs.m_data.get ( ) ) + ( sizeof ( uint16_t ) * this->m_idxs.m_size ) );
 
-      vtx[ vtx_counter++ ] = daisy_vtx_t { { floorf ( p1.x ), floorf ( p1.y ), 0.0f, 1.f }, c1.bgra, { uv1.x, uv1.y } };
-      vtx[ vtx_counter++ ] = daisy_vtx_t { { floorf ( p2.x ), floorf ( p2.y ), 0.0f, 1.f }, c2.bgra, { uv2.x, uv2.y } };
-      vtx[ vtx_counter++ ] = daisy_vtx_t { { floorf ( p3.x ), floorf ( p3.y ), 0.0f, 1.f }, c3.bgra, { uv3.x, uv3.y } };
+      vtx[ vtx_counter++ ] = daisy_vtx_t { { stl::floorf ( p1.x ), stl::floorf ( p1.y ), 0.0f, 1.f }, c1.bgra, { uv1.x, uv1.y } };
+      vtx[ vtx_counter++ ] = daisy_vtx_t { { stl::floorf ( p2.x ), stl::floorf ( p2.y ), 0.0f, 1.f }, c2.bgra, { uv2.x, uv2.y } };
+      vtx[ vtx_counter++ ] = daisy_vtx_t { { stl::floorf ( p3.x ), stl::floorf ( p3.y ), 0.0f, 1.f }, c3.bgra, { uv3.x, uv3.y } };
 
       idx[ idx_counter++ ] = static_cast< uint16_t > ( additional_indices );
       idx[ idx_counter++ ] = static_cast< uint16_t > ( additional_indices + 1 );
@@ -1175,7 +1175,7 @@ namespace daisy
 
       // shoutout 8th grade math
       point_t delta = { p2.x - p1.x, p2.y - p1.y };
-      float length = sqrtf ( delta.x * delta.x + delta.y * delta.y ) + FLT_EPSILON;
+      float length = stl::sqrtf ( delta.x * delta.x + delta.y * delta.y ) + FLT_EPSILON;
 
       float scale = width / ( 2.f * length );
       point_t radius = { -scale * delta.y, scale * delta.x };
@@ -1302,14 +1302,14 @@ namespace daisy
         const auto size = font.text_extent ( text );
 
         if ( alignment & TEXT_ALIGNX_CENTER )
-          corrected_position.x -= floorf ( 0.5f * size.x );
+          corrected_position.x -= stl::floorf ( 0.5f * size.x );
         else if ( alignment & TEXT_ALIGNX_RIGHT )
-          corrected_position.x -= floorf ( size.x );
+          corrected_position.x -= stl::floorf ( size.x );
 
         if ( alignment & TEXT_ALIGNY_CENTER )
-          corrected_position.y -= floorf ( 0.5f * size.y );
+          corrected_position.y -= stl::floorf ( 0.5f * size.y );
         else if ( alignment & TEXT_ALIGNY_BOTTOM )
-          corrected_position.y -= floorf ( size.y );
+          corrected_position.y -= stl::floorf ( size.y );
       }
 
       corrected_position.x -= font.spacing ( );
